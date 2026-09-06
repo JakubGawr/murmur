@@ -196,6 +196,9 @@ test("the drawer reaches the top and the tab strip keeps its width clear", async
     const stripBox = strip.getBoundingClientRect();
     return {
       drawerTop: Math.round(drawer.top),
+      panelHeadTop: Math.round(
+        document.querySelector(".note-tool-drawer .panel-head")!.getBoundingClientRect().top,
+      ),
       drawerRight: Math.round(drawer.right),
       drawerBottom: Math.round(drawer.bottom),
       stripTop: Math.round(stripBox.top),
@@ -208,6 +211,12 @@ test("the drawer reaches the top and the tab strip keeps its width clear", async
 
   // No strip of page colour above the pane: it starts at or above the tab strip.
   expect(layout.drawerTop).toBeLessThanOrEqual(layout.stripTop);
+
+  // And the pane SPENDS that reclaimed band rather than padding it away: its
+  // header sits on the pane's own top edge. (Ask Brain deliberately does the
+  // opposite — it repays the band to keep its header on the note header's
+  // divider line — so this assertion is about the tool pane specifically.)
+  expect(layout.panelHeadTop - layout.drawerTop).toBeLessThanOrEqual(1);
 
   // ...and because it bleeds over that band and is opaque, the strip must keep
   // the pane's width clear, or a tab scrolled to the end sits underneath it —

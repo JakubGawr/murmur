@@ -404,9 +404,12 @@
      against the note header's, and moving the content would break an alignment
      someone deliberately established. `--tabs-strip-height` is 0px when no tab
      is open (AppShellComponent sets it live on <html>), so this collapses to
-     the 8px standoff on its own. */
+     the 8px standoff on its own.
+
+     Only the BOX bleeds here. What each pane does with the reclaimed band is
+     its own call, below: the chat pays it back as padding, the tool pane
+     spends it. */
   margin-top: calc(-1 * (var(--tabs-strip-height, 0px) + var(--space-2)));
-  padding-top: calc(var(--tabs-strip-height, 0px) + var(--space-2));
   flex-direction: column;
   min-height: 0;
   /* ONE continuous hairline divider, full height (it crosses the header band too, so the two panes
@@ -429,6 +432,21 @@
     transform: translateX(0);
   }
 }
+/* Ask Brain PAYS THE BAND BACK. Its header shares one divider line with the
+   note's own header — a deliberate alignment, pinned by
+   e2e/notes/note-chat-drawer.spec.ts — so its content stays exactly where it
+   was even though its surface now reaches the window's top.
+
+   The tool pane does the opposite and SPENDS the band (2026-09-06, user
+   request: "look how much free space there is"). It answers to no such
+   alignment — it is its own surface with its own header — so its content
+   starts at the pane's top edge and the reclaimed strip becomes list rather
+   than padding. This is the one place the two panes differ; if the chat should
+   follow, it is this rule and that spec's header assertion, together. */
+.note-chat-drawer {
+  padding-top: calc(var(--tabs-strip-height, 0px) + var(--space-2));
+}
+
 /* The chat FILLS the whole drawer as ONE flat surface (bare mode = no card frame); its internal
    message log owns the scroll, so the composer pins to the bottom with no empty strip below. */
 .note-chat-drawer .note-chat {
