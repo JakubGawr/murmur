@@ -626,6 +626,9 @@ const SHOTS = {
   // that reuses the app's tokens and its brand mark, so the header image cannot
   // drift from the product the way the hand-drawn one did.
   banner: {
+    // Dark only: banner.html carries its own palette and never follows the app
+    // theme, so a light capture would just be this image under a lighter name.
+    themes: ["dark"],
     viewport: { width: 1280, height: 448 },
     async run(page) {
       await page.goto(`file://${join(__dirname, "banner.html")}`, { waitUntil: "load" });
@@ -649,13 +652,19 @@ async function main() {
   let ok = 0;
   let planned = 0;
   const refused = [];
+  const wrongTheme = [];
   const jobs = [];
   for (const name of names) {
     if (!SHOTS[name]) {
       console.error(`✗ unknown shot: ${name}`);
       continue;
     }
-    for (const theme of THEMES) jobs.push([name, theme]);
+    // A shot may opt out of a theme (see `banner`).
+    const allowed = SHOTS[name].themes;
+    for (const theme of THEMES) {
+      if (allowed && !allowed.includes(theme)) continue;
+      jobs.push([name, theme]);
+    }
   }
   planned = jobs.length;
   for (const [name, theme] of jobs) {
@@ -685,10 +694,10 @@ async function main() {
     }
     try {
       await shot.run(page);
-      const wrongTheme = await themeMismatch(page, theme);
-      if (wrongTheme) {
-        refused.push(`${name} (${theme})`);
-        console.error(`⛔ ${name} [${theme}]: WRONG THEME — ${wrongTheme}`);
+      const mismatch = await themeMismatch(page, theme);
+      if (mismatch) {
+        wrongTheme.push(`${name} (${theme})`);
+        console.error(`⛔ ${name} [${theme}]: WRONG THEME — ${mismatch}`);
         continue;
       }
       const leaks = await privacyViolations(page);
@@ -711,6 +720,10 @@ async function main() {
   console.log(`\n${ok}/${planned} shots captured (${THEMES.join(" + ")}) → ${OUT}`);
   if (refused.length) {
     console.error(`REFUSED for privacy: ${refused.join(", ")}`);
+    process.exitCode = 1;
+  }
+  if (wrongTheme.length) {
+    console.error(`REFUSED for wrong theme: ${wrongTheme.join(", ")}`);
     process.exitCode = 1;
   }
 }
