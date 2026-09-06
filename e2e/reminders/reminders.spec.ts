@@ -2442,7 +2442,16 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
   const notePanel = page.locator("app-note-reminders-panel");
   await expect(notePanel).toBeVisible();
   await notePanel.getByRole("button", { name: "New reminder" }).click();
-  await expect(composer.getByText("Atlas — PRD v3")).toBeVisible();
+  // The anchor arrives WITHOUT a title, and that is the lock model working, not a
+  // regression: both this panel and the smart card open the composer with
+  // `title: ""` on purpose — "the parent title is deliberately never trusted
+  // here … submit re-gates it and the canonical list can resolve a visible
+  // title". The old assertion read "Atlas — PRD v3" because the card's create
+  // action used a source from a GATED AUDIT, which had already earned a title.
+  // The drawer has no audit behind it, so it carries the opaque id — which is
+  // still the thing this block exists to prove: routed authored-note context
+  // reaches the composer. Matches note-reminders-drawer.spec.ts.
+  await expect(composer.getByText("n-atlas-prd", { exact: true })).toBeVisible();
   await composer.getByRole("button", { name: "Cancel" }).click();
   // Leave the drawer as this block found it — the assertions after this one read
   // the note surface, not the drawer.
