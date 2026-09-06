@@ -165,6 +165,9 @@
   --shell-panel-shadow: none;
   --shell-panel-border: 0 solid transparent;
   --shell-panel-border-right: 1px solid var(--border);
+  /* Pay back exactly the 8px gutter + 1px border the flush panel gave up, so
+     the top row's glyphs stay level with the macOS window buttons. */
+  --shell-topbar-lead: 9px;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

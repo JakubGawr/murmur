@@ -393,8 +393,20 @@
      the top, cut at the bottom" look). `.editor-body` owns the note scroll, the chat owns its own,
      so both panes stay put relative to each other. */
   flex: none;
-  width: clamp(320px, 30vw, 400px);
+  width: var(--note-drawer-w);
   display: flex;
+  /* REACH THE TOP (2026-09-06, user request: "the sidebar should go all the way
+     up"). The editor starts below the tab strip, so the pane's SURFACE stopped
+     there too and left a strip of page colour above it. The box now bleeds up
+     over the strip's band and pays the same distance back as padding, so the
+     pane is full-height while its header stays exactly where it was — which
+     matters: e2e/notes/note-chat-drawer.spec.ts pins the chat pane's header
+     against the note header's, and moving the content would break an alignment
+     someone deliberately established. `--tabs-strip-height` is 0px when no tab
+     is open (AppShellComponent sets it live on <html>), so this collapses to
+     the 8px standoff on its own. */
+  margin-top: calc(-1 * (var(--tabs-strip-height, 0px) + var(--space-2)));
+  padding-top: calc(var(--tabs-strip-height, 0px) + var(--space-2));
   flex-direction: column;
   min-height: 0;
   /* ONE continuous hairline divider, full height (it crosses the header band too, so the two panes

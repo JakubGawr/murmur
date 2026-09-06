@@ -179,6 +179,46 @@ test("the drawer and Ask Brain are mutually exclusive, and the drawer persists",
   await expect(page.locator("app-note-reminders-panel")).toBeVisible();
 });
 
+test("the drawer reaches the top and the tab strip keeps its width clear", async ({
+  page,
+}) => {
+  await mockNotes(page, {}, [], { list_reminders: REMINDERS_FIXTURE });
+  await page.goto("/notes/n1");
+  await expect(page.locator(".note-title-input")).toHaveValue("My First Note");
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
+  await expect(page.locator("app-note-reminders-panel")).toBeVisible();
+  // The pane slides in horizontally; measure at rest or the numbers are mid-animation.
+  await page.waitForTimeout(500);
+
+  const layout = await page.evaluate(() => {
+    const drawer = document.querySelector(".note-tool-drawer")!.getBoundingClientRect();
+    const strip = document.querySelector(".tab-strip")!;
+    const stripBox = strip.getBoundingClientRect();
+    return {
+      drawerTop: Math.round(drawer.top),
+      drawerRight: Math.round(drawer.right),
+      drawerBottom: Math.round(drawer.bottom),
+      stripTop: Math.round(stripBox.top),
+      stripContentRight: Math.round(stripBox.right - parseFloat(getComputedStyle(strip).paddingRight)),
+      drawerLeft: Math.round(drawer.left),
+      viewportW: window.innerWidth,
+      viewportH: window.innerHeight,
+    };
+  });
+
+  // No strip of page colour above the pane: it starts at or above the tab strip.
+  expect(layout.drawerTop).toBeLessThanOrEqual(layout.stripTop);
+
+  // ...and because it bleeds over that band and is opaque, the strip must keep
+  // the pane's width clear, or a tab scrolled to the end sits underneath it —
+  // visible to a `toBeVisible()` assertion and dead to a click, the failure mode
+  // e2e/settings/settings-modal.spec.ts exists to describe elsewhere.
+  expect(layout.stripContentRight).toBeLessThanOrEqual(layout.drawerLeft);
+
+  // Flush to the bottom, with no gap left under it.
+  expect(layout.viewportH - layout.drawerBottom).toBeLessThanOrEqual(2);
+});
+
 test("creating from the drawer opens the composer with this note attached", async ({
   page,
 }) => {

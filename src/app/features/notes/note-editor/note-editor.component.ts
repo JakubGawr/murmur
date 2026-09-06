@@ -752,6 +752,30 @@ export class NoteEditorComponent {
     }
   });
 
+  /**
+   * Publish the open tool column's width on `<html>` so the SHELL's tab strip
+   * can keep that much room clear on its right.
+   *
+   * The drawer bleeds up over the strip's band to reach the window's top edge
+   * and it is opaque, so without this a tab scrolled to the end would sit
+   * underneath it — visible-looking and unclickable, which is the exact failure
+   * `e2e/settings/settings-modal.spec.ts` was written about in another part of
+   * the app. A custom property is the channel because the strip is a sibling in
+   * the shell, not a child of this editor; `AppShellComponent` publishes
+   * `--tabs-strip-height` the same way, in the other direction.
+   *
+   * Cleared on destroy — a stale reservation would indent the strip on every
+   * other route.
+   */
+  private readonly _publishDrawerWidth = effect(() => {
+    const open =
+      !this.embedded() && (this.noteChatOpen() || this.noteRemindersOpen());
+    document.documentElement.style.setProperty(
+      "--note-drawer-open-w",
+      open ? "var(--note-drawer-w)" : "0px",
+    );
+  });
+
   /** Persist the reminders drawer open state (mirrors {@link _persistChatOpen}). */
   private readonly _persistRemindersOpen = effect(() => {
     const value = this.noteRemindersOpen();
@@ -773,6 +797,10 @@ export class NoteEditorComponent {
     // fire-and-forget so navigation is instant; the backend re-indexes + re-exports (+
     // auto-titles) in the background. Nothing is lost either way (cheap autosaves already
     // persisted the text).
+    this.destroyRef.onDestroy(() => {
+      // Release the tab strip's reservation; see `_publishDrawerWidth`.
+      document.documentElement.style.removeProperty("--note-drawer-open-w");
+    });
     this.destroyRef.onDestroy(() => void this.runNoteBoundaryWork());
 
     // Root-cause fix (2026-07-15): the callback above ONLY ever fired on a hard close (✕)

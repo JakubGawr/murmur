@@ -397,6 +397,7 @@ app-shell.sidebar-collapsed {
   justify-content: flex-end;
   gap: var(--space-1);
   height: var(--shell-topbar-h);
+  margin-top: var(--shell-topbar-lead);
   padding-right: var(--space-2);
 }
 

@@ -155,6 +155,19 @@
      No CSS can read the native buttons' real box, so a change to the window
      chrome means re-measuring this one value. */
   --shell-topbar-h: 34px;
+  /* How far the row starts BELOW the panel's own top edge.
+     The 26px centre above is measured from the WINDOW, not from the panel, and
+     it used to arrive for free: 8px gutter + 1px border + 34/2. A skin that
+     glues the panel to the window removes both, which drops the row to a 17px
+     centre and leaves the glyphs sitting visibly above the macOS window
+     buttons — the regression this token exists to cancel. It is the gutter and
+     border a skin gives up, so Paper pays exactly 9px back here. */
+  --shell-topbar-lead: 0px;
+
+  /* The note editor's tool column (Ask Brain, Reminders). A token because TWO
+     things must agree on it: the drawer's own width, and how much room the tab
+     strip must keep clear so a tab can never scroll underneath it. */
+  --note-drawer-w: clamp(320px, 30vw, 400px);
 
   /* The three footer controls — Capture, New note, and the create menu's
      chevron. One token because they must stay identical squares: the moment

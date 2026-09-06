@@ -29,7 +29,14 @@
   flex: none;
   gap: var(--space-1);
   height: 48px;
-  padding: 0 var(--space-5);
+  /* The note editor's tool column bleeds UP over this band so it can reach the
+     window's top edge, and it is opaque. Keep its width clear on the right or a
+     tab scrolled to the end would slide underneath it and stop being clickable.
+     `--note-drawer-open-w` is set on <html> by the editor while a drawer is
+     open and is 0px otherwise — the same live-custom-property channel the shell
+     already uses for `--tabs-strip-height`. */
+  padding: 0 calc(var(--space-5) + var(--note-drawer-open-w, 0px)) 0
+    var(--space-5);
   overflow-x: auto;
 }
 
