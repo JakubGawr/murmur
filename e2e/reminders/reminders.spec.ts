@@ -1445,7 +1445,15 @@ test("Reminder composer: focus, source limit, and busy source locking stay coher
   const edit = row.getByRole("button", { name: "Edit" });
   const composer = page.locator("app-reminder-composer");
 
-  await edit.click();
+  // SIMULATE WEBKIT'S CLICK so Chromium exercises the same path. Safari does not
+  // focus a <button> on click (the macOS convention), so `document.activeElement`
+  // stays <body> and the composer can only restore focus through the pointer
+  // target it remembered. `dispatchEvent` moves no focus, and `mousedown` still
+  // feeds `rememberPointerTarget` — which is what a real WebKit click does.
+  // Without this, Chromium focuses the button, never reaches the fallback, and a
+  // broken fallback ships green here while failing the webkit lane.
+  await edit.locator("svg").first().dispatchEvent("mousedown");
+  await edit.dispatchEvent("click");
   const dialog = composer.getByRole("dialog");
   const titleInput = composer.locator('input[type="text"]').first();
   await expect(titleInput).toBeFocused();
