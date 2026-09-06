@@ -260,6 +260,48 @@ test("the drawer reaches the top and the tab strip keeps its width clear", async
   ).toBeLessThanOrEqual(2);
 });
 
+test("the pane's header controls take a click across their whole surface", async ({
+  page,
+}) => {
+  await mockNotes(page, {}, [], { list_reminders: REMINDERS_FIXTURE });
+  await page.goto("/notes/n1");
+  await expect(page.locator(".note-title-input")).toHaveValue("My First Note");
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
+  await expect(page.locator("app-note-reminders-panel")).toBeVisible();
+  await page.waitForTimeout(500);
+
+  // HIT-TESTING, not visibility — the distinction this suite has paid for once
+  // already (see e2e/settings/settings-modal.spec.ts, where a `toBeVisible()`
+  // assertion passed while ~30 specs timed out on a click that landed on a
+  // scroller sitting on top). The pane bleeds up to the window's top edge, which
+  // puts its header inside `.shell-drag`: a fixed, full-width, 32px window-drag
+  // strip at `z-index: 8`. Before the pane took a matching rank, the top 12px of
+  // this 30px button hit-tested to that strip — perfectly visible and dead.
+  for (const selector of [
+    "app-note-reminders-panel .panel-head .btn-primary",
+    "app-note-reminders-panel .panel-close",
+  ]) {
+    const reachable = await page.evaluate((sel) => {
+      const el = document.querySelector(sel)!;
+      const r = el.getBoundingClientRect();
+      const results: boolean[] = [];
+      for (const fy of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+        for (const fx of [0.15, 0.5, 0.85]) {
+          const hit = document.elementFromPoint(
+            Math.round(r.left + r.width * fx),
+            Math.round(r.top + r.height * fy),
+          );
+          results.push(!!hit?.closest(sel));
+        }
+      }
+      return results;
+    }, selector);
+    expect(reachable, `${selector} must be clickable everywhere`).toEqual(
+      new Array(15).fill(true),
+    );
+  }
+});
+
 test("creating from the drawer opens the composer with this note attached", async ({
   page,
 }) => {

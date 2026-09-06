@@ -410,6 +410,23 @@
      its own call, below: the chat pays it back as padding, the tool pane
      spends it. */
   margin-top: calc(-1 * (var(--tabs-strip-height, 0px) + var(--space-2)));
+  /* ABOVE THE WINDOW-DRAG STRIP (2026-09-06, user report: "the New reminder
+     button doesn't take a click on its whole surface").
+     `.shell-drag` is `position: fixed`, full width, 32px tall, `z-index: 8` —
+     the band you drag the window by. Bleeding this pane up to the window's top
+     put its header INSIDE that band, so the top 12px of a 30px button was
+     hit-tested to the drag strip: visible, and dead to a click. Exactly the
+     failure `e2e/settings/settings-modal.spec.ts` was written about, where a
+     `toBeVisible()` assertion passed while thirty specs timed out clicking.
+     The sidebar solved this long ago by sitting at `z-index: 9`; this pane is
+     the same kind of chrome and takes the same rank.
+
+     The trade-off, stated: the window can no longer be dragged by the strip of
+     title bar this pane covers. Everywhere else along the top still drags, and
+     a band that now holds three controls is the wrong place to grab a window
+     anyway. */
+  position: relative;
+  z-index: 9;
   flex-direction: column;
   min-height: 0;
   /* THE SHELL'S OWN PANEL FRAME (2026-09-06, user request: "the right pane still
