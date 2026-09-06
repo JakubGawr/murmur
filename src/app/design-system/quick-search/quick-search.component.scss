@@ -8,8 +8,10 @@
   align-items: flex-start;
   padding: 14vh var(--space-4) var(--space-4);
   background: rgba(0, 0, 0, 0.42);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  /* A fraction of --glass-blur (30px x 0.2 = 6px, unchanged) so a skin that
+     turns the material off reaches this too. */
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.2));
+  backdrop-filter: blur(calc(var(--glass-blur) * 0.2));
 }
 /* Panel: OPAQUE overlay surface (rule T3 — never the frosted .card). */
 .qs-panel {

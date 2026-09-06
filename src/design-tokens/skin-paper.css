@@ -139,6 +139,14 @@
   --aurora-opacity: 0;
   --aurora-field: none;
   --shadow-accent: none;
+  /* The `.btn` ground stops being a translucent white wash — on Paper's light
+     ground that film is white-on-white, which is exactly how the sidebar's two
+     round footer buttons came out nearly invisible. */
+  --btn-bg: var(--surface-input);
+  /* Capture and its two round neighbours stop being pills. Notion's and
+     Obsidian's sidebars square these off; a lone fully-round accent pill was
+     the loudest remaining "app control" in an otherwise document-shaped rail. */
+  --shell-footer-btn-radius: var(--radius-sm);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -208,7 +216,7 @@
   --accent-text: #9dbfe6;
   --accent-soft: rgba(63, 111, 181, 0.22);
   --accent-ring: rgba(110, 150, 210, 0.55);
-  --shell-active-icon: #9dbfe6;
+  --shell-active-icon: #ece9e4;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -267,7 +275,7 @@
   --accent-text: #234e83;  /* link text = 8.01:1 on --surface-base */
   --accent-soft: rgba(44, 95, 158, 0.12);
   --accent-ring: rgba(44, 95, 158, 0.45);
-  --shell-active-icon: #2c5f9e;
+  --shell-active-icon: #22201d;
 }
 
 @media (prefers-color-scheme: light) {
@@ -324,6 +332,6 @@
     --accent-text: #234e83;
     --accent-soft: rgba(44, 95, 158, 0.12);
     --accent-ring: rgba(44, 95, 158, 0.45);
-    --shell-active-icon: #2c5f9e;
+    --shell-active-icon: #22201d;
   }
 }

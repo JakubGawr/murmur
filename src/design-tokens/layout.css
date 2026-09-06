@@ -131,6 +131,13 @@
      sits beside it. Capture takes the remaining width; the round one stays
      square, so a single size keeps them on one line. */
   --shell-footer-btn: 36px;
+  /* Their SHAPE, separate from their size, because it is the one thing a skin
+     legitimately disagrees about: a full pill reads as an app control, and a
+     document-shaped skin wants the same square-ish corner as everything else.
+     Deliberately NOT `--radius-pill` itself — that token also shapes the
+     toggle switch, the scrollbar thumb, the slider track and every status
+     pill, none of which should stop being round. */
+  --shell-footer-btn-radius: var(--radius-pill);
   /* Collapsed width: the panel wraps the macOS window buttons with the SAME
      margin on each side.
 
