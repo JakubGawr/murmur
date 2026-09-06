@@ -99,6 +99,32 @@ const EMAIL_ALLOW = /@(sonora|example)(\.|$|\b)/i;
  * the shot is publishable. Reads `innerText` (what a reader sees) plus the
  * document title (what the window chrome shows).
  */
+/**
+ * The value of `--surface-base` in each theme (design-tokens/colors.css and
+ * theme-light.css). Read off the live app rather than trusted from here — this
+ * is only the expectation to compare against.
+ */
+const THEME_BASE = { dark: "#07070b", light: "#f3f3f8" };
+
+/**
+ * Did the page actually render in the theme we asked for?
+ *
+ * WHY THIS EXISTS. The driver setting `colorScheme` on the context is NOT
+ * sufficient on its own: mock-tauri.js pins `murmur-theme` in localStorage, and
+ * while it pinned "dark" unconditionally the first light run produced 30 files
+ * byte-identical to their dark counterparts — and reported "60/60 shots
+ * captured". A wrong screenshot under a right filename is worse than a missing
+ * one, because nothing downstream can tell. Returns "" when it matches.
+ */
+async function themeMismatch(page, theme) {
+  const base = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--surface-base").trim(),
+  );
+  if (!base) return `--surface-base is empty (tokens did not load?)`;
+  const want = THEME_BASE[theme];
+  return base.toLowerCase() === want ? "" : `rendered --surface-base ${base}, expected ${want} for ${theme}`;
+}
+
 async function privacyViolations(page) {
   const { text, title } = await page.evaluate(() => ({
     text: document.body ? document.body.innerText || "" : "",
@@ -601,6 +627,9 @@ async function main() {
     // boards, tasks, ask grounding). They are opt-in because this mock is also the
     // e2e suite's base fixture — see the SHARED FIXTURE WARNING in mock-tauri.js.
     await page.addInitScript("window.__demoRich = true;");
+    // MUST precede the mock: mock-tauri.js reads this to pin `murmur-theme`, and
+    // without it the app boots dark no matter what colour scheme the context has.
+    await page.addInitScript(`window.__demoTheme = ${JSON.stringify(theme)};`);
     await page.addInitScript(`window.__demoVersion = ${JSON.stringify(VERSION)};`);
     await page.addInitScript(MOCK);
     if (shot.config) {
@@ -608,6 +637,12 @@ async function main() {
     }
     try {
       await shot.run(page);
+      const wrongTheme = await themeMismatch(page, theme);
+      if (wrongTheme) {
+        refused.push(`${name} (${theme})`);
+        console.error(`⛔ ${name} [${theme}]: WRONG THEME — ${wrongTheme}`);
+        continue;
+      }
       const leaks = await privacyViolations(page);
       if (leaks.length) {
         refused.push(`${name} (${theme})`);
