@@ -160,13 +160,51 @@ async function liveCaption(page, text) {
   await page.evaluate(([evt, t]) => window.__demoEmit(evt, { text: t }), [EVENT_LIVE_CAPTION, text]);
 }
 
-/** Open one of the shell's two context panels ("Spaces" / "Browse"). */
+/**
+ * Open one of the shell's sidebar sections.
+ *
+ * REWRITTEN against the shipping shell. This targeted `nav.global-rail` and an
+ * `aria-pressed` panel toggle; neither exists any more (`nav.global-rail` matches
+ * ZERO elements today), so every shot that called it timed out and was skipped —
+ * silently, because a per-shot exception is caught and the run continues. That is
+ * how `hero-spaces`, `spaces-locked` and `library` quietly kept shipping images
+ * from a build four releases old.
+ *
+ * The shell now has two navs, and they behave differently:
+ *  - `nav.sb-nav` holds Workspaces / Shared, and ONLY while the sidebar is
+ *    COLLAPSED — clicking one expands the sidebar and removes the button. The
+ *    sidebar defaults to expanded (app-shell.component.ts, readStoredBoolean(...,
+ *    true)), so an absent button means the panel is already open. Waiting for it
+ *    is precisely the bug.
+ *  - `nav.sb-browse` is a disclosure carrying `aria-expanded`, defaulting to
+ *    false, whose sublist also needs the sidebar expanded.
+ */
 async function openPanel(page, label) {
-  const btn = page.locator(`nav.global-rail button[aria-label="${label}"]`);
-  await btn.waitFor({ timeout: 10_000 });
-  const pressed = await btn.getAttribute("aria-pressed");
-  if (pressed !== "true") await btn.click();
-  await settle(page, 500);
+  if (label === "Browse") {
+    await expandSidebar(page);
+    const btn = page.locator('nav.sb-browse button[aria-label="Browse"]');
+    await btn.waitFor({ timeout: 10_000 });
+    if ((await btn.getAttribute("aria-expanded")) !== "true") await btn.click();
+    await settle(page, 500);
+    return;
+  }
+  // Workspaces / Shared: present only while collapsed, so clicking is what OPENS
+  // them and absence is success, not failure.
+  const btn = page.locator(`nav.sb-nav button[aria-label="${label}"]`);
+  if (await btn.count()) {
+    await btn.click();
+    await settle(page, 500);
+  }
+}
+
+/** Make sure the sidebar is expanded (it is by default; a stored preference can differ). */
+async function expandSidebar(page) {
+  if (!(await page.locator(".sidebar-collapsed").count())) return;
+  const btn = page.locator('nav.sb-nav button[aria-label="Workspaces"]');
+  if (await btn.count()) {
+    await btn.click();
+    await settle(page, 400);
+  }
 }
 
 /**
@@ -219,7 +257,7 @@ const SHOTS = {
     viewport: APP,
     async run(page) {
       await goto(page, "/container/f-atlas");
-      await openPanel(page, "Spaces");
+      await openPanel(page, "Workspaces");
       await settle(page, 900);
     },
   },
@@ -230,7 +268,7 @@ const SHOTS = {
     viewport: { width: 1440, height: 640 },
     async run(page) {
       await goto(page, "/container/f-personal");
-      await openPanel(page, "Spaces");
+      await openPanel(page, "Workspaces");
       await settle(page, 900);
     },
   },
