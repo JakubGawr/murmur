@@ -25,8 +25,22 @@
      height gains back exactly what the margin removes, so the bottom edge — and the Ask
      Brain column reaching it — is unchanged. */
   margin-top: calc(var(--space-2) - var(--space-7));
-  height: calc(100vh - 10px - var(--tabs-strip-height, 0px) - var(--space-2));
+  height: calc(
+    100vh - var(--shell-vertical-inset) - var(--tabs-strip-height, 0px) -
+      var(--space-2)
+  );
   margin-bottom: calc(-1 * var(--space-8));
+  /* FULL-BLEED HORIZONTALLY (2026-09-06, user request: "the drawer should go all
+     the way right, with no empty space"). `.app-main` pays `--space-5` left and
+     right on every route — right for a page of centred content, wrong for this
+     one, whose right edge is a TOOL COLUMN. Left unpaid it stranded the drawer
+     24px short of the content column, and the shell's own gutter put another 8px
+     after that. The document stays CENTRED rather than sliding: `.note-doc` has
+     its own `max-width` + `margin: 0 auto`, so widening the box it centres in
+     moves it by half the difference — measured at 6px, not a jump. Cancelled in
+     embedded mode below, like the vertical bleed. */
+  margin-left: calc(-1 * var(--space-5));
+  margin-right: calc(-1 * var(--space-5));
   min-height: 0;
 }
 
@@ -54,6 +68,8 @@
      into the recording chrome above it. */
   margin-top: 0;
   margin-bottom: 0;
+  margin-left: 0;
+  margin-right: 0;
 }
 .editor.is-embedded {
   height: 100%;

@@ -151,6 +151,20 @@
      switch, scrollbar thumbs, slider and meter tracks, spinners, count badges —
      keep `--radius-pill` and stay round. */
   --radius-control: var(--radius-sm);
+
+  /* The shell stops floating. Notion and Obsidian glue their sidebar to the
+     window and separate it with ONE hairline; a rounded pane inset by a gutter
+     is the Studio idea, not this one. Gutter to zero closes the empty strip
+     around every panel — including the note's tool drawers, which then reach the
+     window's right edge and its bottom — and the panel frame collapses to that
+     single right-hand hairline. */
+  --shell-gutter: 0px;
+  --shell-vertical-inset: 0px;
+  --shell-rail-inset: 0px;
+  --shell-panel-radius: 0px;
+  --shell-panel-shadow: none;
+  --shell-panel-border: 0 solid transparent;
+  --shell-panel-border-right: 1px solid var(--border);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

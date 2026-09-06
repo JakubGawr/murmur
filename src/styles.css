@@ -155,8 +155,8 @@ app-shell {
 .drill-rail {
   display: flex;
   flex-direction: column;
-  height: calc(100% - 20px);
-  margin: 10px 0 10px 10px;
+  height: calc(100% - 2 * var(--shell-rail-inset));
+  margin: var(--shell-rail-inset) 0 var(--shell-rail-inset) var(--shell-rail-inset);
   padding: 0 var(--space-3) var(--space-4);
   /* Veil (slider-driven opacity) OVER the adaptive glass fill. */
   background:
@@ -164,9 +164,10 @@ app-shell {
     var(--shell-glass-bg);
   -webkit-backdrop-filter: blur(var(--shell-glass-blur)) saturate(var(--shell-glass-saturate));
   backdrop-filter: blur(var(--shell-glass-blur)) saturate(var(--shell-glass-saturate));
-  border: 1px solid var(--shell-glass-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md), var(--shell-glass-inner);
+  border: var(--shell-panel-border);
+  border-right: var(--shell-panel-border-right);
+  border-radius: var(--shell-panel-radius);
+  box-shadow: var(--shell-panel-shadow), var(--shell-glass-inner);
   overflow: hidden;
 }
 
@@ -179,8 +180,12 @@ app-shell {
    edge, so they keep the full Liquid-Glass --radius-xl.) */
 .drill-rail,
 .app-sidebar {
-  border-top-left-radius: var(--radius-md);
-  border-bottom-left-radius: var(--radius-md);
+  /* `min()` so a skin that flattens the panel flattens these two corners with
+     it — a 13px curve left behind on an otherwise square, window-flush rail is
+     the exact "stacked mismatched corners" problem this rule exists to avoid,
+     just in the other direction. */
+  border-top-left-radius: min(var(--radius-md), var(--shell-panel-radius));
+  border-bottom-left-radius: min(var(--radius-md), var(--shell-panel-radius));
 }
 
 .nav-icon {
@@ -347,9 +352,9 @@ app-shell {
    linked stylesheet. The rail chooses a surface; the adjacent panel contains
    only that surface's navigation. */
 app-shell {
-  gap: var(--space-2);
+  gap: var(--shell-gutter);
   height: 100vh;
-  padding: var(--space-2);
+  padding: var(--shell-gutter);
   overflow: hidden;
 
   /* Where the content pane actually begins: the shell's own padding, the
@@ -365,13 +370,13 @@ app-shell {
      instead — which is why ~30 settings e2e tests timed out on a click
      rather than failing an assertion. */
   --shell-content-inset: calc(
-    var(--space-2) + var(--shell-sidebar-w) + var(--space-2)
+    var(--shell-gutter) + var(--shell-sidebar-w) + var(--shell-gutter)
   );
 }
 
 app-shell.sidebar-collapsed {
   --shell-content-inset: calc(
-    var(--space-2) + var(--shell-sidebar-w-collapsed) + var(--space-2)
+    var(--shell-gutter) + var(--shell-sidebar-w-collapsed) + var(--shell-gutter)
   );
 }
 
@@ -455,7 +460,7 @@ app-shell.sidebar-collapsed {
   flex: 0 0 var(--shell-sidebar-w);
   flex-direction: column;
   width: var(--shell-sidebar-w);
-  height: calc(100vh - var(--space-4));
+  height: calc(100vh - 2 * var(--shell-gutter));
   transition: flex-basis var(--transition-fast), width var(--transition-fast);
   margin: 0;
   padding: 0;
@@ -464,9 +469,10 @@ app-shell.sidebar-collapsed {
     var(--shell-glass-bg);
   -webkit-backdrop-filter: blur(var(--shell-glass-blur)) saturate(var(--shell-glass-saturate));
   backdrop-filter: blur(var(--shell-glass-blur)) saturate(var(--shell-glass-saturate));
-  border: 1px solid var(--shell-glass-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md), var(--shell-glass-inner);
+  border: var(--shell-panel-border);
+  border-right: var(--shell-panel-border-right);
+  border-radius: var(--shell-panel-radius);
+  box-shadow: var(--shell-panel-shadow), var(--shell-glass-inner);
   overflow: hidden;
 }
 
@@ -1028,7 +1034,7 @@ app-shell.sidebar-collapsed {
 }
 
 app-shell > .main-col {
-  height: calc(100vh - var(--space-4));
+  height: calc(100vh - 2 * var(--shell-gutter));
   margin: 0;
   overflow: auto;
 }

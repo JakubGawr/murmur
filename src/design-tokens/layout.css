@@ -114,6 +114,27 @@
      and the workspace tree; collapsed it narrows to icons only. The width
      animates between the two, so both ends live here as tokens rather than as
      literals inside the shell chrome in styles.css. */
+  /* --- How the shell FRAMES its panels ------------------------------------
+     Studio floats the sidebar and the content column as rounded panels over the
+     window: a gutter all round, a radius, a border and a shadow. A
+     document-shaped skin wants the opposite — chrome glued to the window edges
+     with a single hairline, the way Notion and Obsidian do it. Every value
+     below is what Studio ships, so the default frame is unchanged.
+
+     `--shell-vertical-inset` is the odd one and is called out rather than
+     tidied: the routed editor sizes itself as `100vh` minus this, and the value
+     that ships is 10px, NOT the 2x8px gutter it looks like it should be. The
+     editor therefore overhangs its column by ~6px today. Reproducing that
+     exactly is deliberate — correcting it is a separate change with its own
+     screenshot, not a side effect of adding a skin. */
+  --shell-gutter: var(--space-2);
+  --shell-vertical-inset: 10px;
+  --shell-rail-inset: 10px;
+  --shell-panel-radius: var(--radius-xl);
+  --shell-panel-shadow: var(--shadow-md);
+  --shell-panel-border: 1px solid var(--shell-glass-border);
+  --shell-panel-border-right: var(--shell-panel-border);
+
   --shell-sidebar-w: calc(var(--space-8) * 4);
 
   /* The sidebar's own top row. It holds Search / Settings / Collapse at its
