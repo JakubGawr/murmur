@@ -26,11 +26,19 @@ shopt -s nullglob
 before=0
 after=0
 count=0
+oversize=()
 for f in "$DIR"/*.png; do
   sz=$(stat -f%z "$f"); before=$((before + sz))
   w=$(sips -g pixelWidth "$f" | awk '/pixelWidth/{print $2}')
   if [ "${w:-0}" -gt "$TARGET_W" ]; then
     sips --resampleWidth "$TARGET_W" "$f" >/dev/null
+    # VERIFY, do not trust. `sips` can exit 0, print the path, and change
+    # nothing at all when it cannot write its temp file (a sandbox, a full or
+    # unwritable TMPDIR). The run then "succeeds" while leaving a full-resolution
+    # set behind, and pngquant's savings make the summary line look plausible —
+    # the whole set stays ~5x too heavy and nothing says so.
+    w=$(sips -g pixelWidth "$f" | awk '/pixelWidth/{print $2}')
+    [ "${w:-0}" -gt "$TARGET_W" ] && oversize+=("$(basename "$f") (${w}px)")
   fi
   # `--skip-if-larger` keeps a shot that does not benefit from quantization
   # rather than replacing it with a bigger file.
@@ -45,3 +53,12 @@ fi
 printf '%d shots: %.1f MB -> %.1f MB\n' "$count" \
   "$(echo "$before" | awk '{print $1/1048576}')" \
   "$(echo "$after" | awk '{print $1/1048576}')"
+
+if [ ${#oversize[@]} -gt 0 ]; then
+  echo "" >&2
+  echo "sips did not resample ${#oversize[@]} file(s) — still wider than ${TARGET_W}px:" >&2
+  printf '  %s\n' "${oversize[@]}" >&2
+  echo "These are NOT ready to commit. sips writes through a temp file; check that" >&2
+  echo "TMPDIR is writable, then re-run." >&2
+  exit 1
+fi

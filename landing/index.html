@@ -6,6 +6,7 @@
   <title>Murmur — local-first meeting notes with a brain</title>
   <meta name="description" content="Murmur records meetings and transcribes them on-device. Run AI locally, or explicitly opt into redacted cloud AI; your meeting archive stays on your Mac." />
   <link rel="icon" href="./assets/icon.svg" />
+  <link rel="preload" as="font" type="font/woff2" href="./assets/fonts/hanken-grotesk.woff2" crossorigin />
   <meta property="og:title" content="Murmur — local-first meeting notes with a brain" />
   <meta property="og:description" content="On-device transcription for macOS. Run AI locally or explicitly opt into redacted cloud AI." />
   <meta property="og:type" content="website" />
@@ -18,6 +19,28 @@
     })();
   </script>
   <style>
+    /* ── The app's own type, self-hosted ──────────────────────────────────
+       Murmur ships "Hanken Grotesk" (src/styles.css @font-face, variable woff2,
+       35 kB) and sets every screen in it. This page was set in SF Pro, so the
+       product screenshots below — rendered in Hanken Grotesk — always read as a
+       different product from the page around them. Same files, copied into
+       landing/assets/fonts/ so the page has no runtime dependency on the app
+       tree and no third-party font request.
+       ───────────────────────────────────────────────────────────────────── */
+    @font-face {
+      font-family: "Hanken Grotesk";
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url("./assets/fonts/hanken-grotesk.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "JetBrains Mono";
+      font-style: normal;
+      font-weight: 100 800;
+      font-display: swap;
+      src: url("./assets/fonts/jetbrains-mono.woff2") format("woff2");
+    }
     /* ─────────────────────────────────────────────────────────────
        Quiet Glass tokens — mirrored from the shipping app
        (src/design-tokens/*.css) so the site and the product read as
@@ -61,8 +84,9 @@
       --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.35);
       --shadow-lg: 0 22px 56px rgba(0, 0, 0, 0.48);
 
-      --font: -apple-system, "SF Pro Display", "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
-      --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+      /* Mirrors --font-sans in src/design-tokens/typography.css. */
+      --font: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 
       --maxw: 1120px;
       color-scheme: dark;
@@ -360,6 +384,7 @@
     @media (max-width: 920px) { .privacy-grid { grid-template-columns: 1fr 1fr; } }
     @media (max-width: 620px) { .privacy-grid { grid-template-columns: 1fr; } }
     .pcard { border-top: 1px solid var(--border); padding-top: 22px; }
+    .pcard.wide { grid-column: 1 / -1; }
     .pcard .ic { width: 40px; height: 40px; border-radius: var(--radius-sm); display: grid; place-items: center; background: var(--surface-hover); color: var(--accent-text); margin-bottom: 14px; }
     .pcard.green .ic { color: var(--safe-text); }
     .pcard .ic svg { width: 21px; height: 21px; }
@@ -539,7 +564,7 @@
             poster="./assets/promo-poster.jpg"
             preload="none"
             playsinline
-            aria-label="A 90-second tour of Murmur: a meeting being recorded while a note is typed alongside it, the note Murmur writes afterwards and the items it pulls out, the dual-stream speaker timeline, a question asked across the whole vault and answered with sources, the brain graph, the Workspaces rail and on-device search, a live board, People, and a workspace refusing to open because it is sealed">
+            aria-label="A 90-second tour of Murmur: a meeting being recorded while a note is typed alongside it, the note Murmur writes afterwards and the items it pulls out, the dual-stream speaker timeline, a question asked across the whole vault and answered with sources, the brain graph, the Workspaces rail and on-device search, a live board, People, and a Workspace refusing to open because it is sealed">
             <source src="./assets/promo-web.webm" type="video/webm" />
             <source src="./assets/promo-web.mp4" type="video/mp4" />
           </video>
@@ -596,14 +621,14 @@
       <div class="section-head reveal">
         <span class="eyebrow" style="color:var(--safe-text)">Security &amp; Privacy</span>
         <h2>Privacy isn't a setting. It's the architecture.</h2>
-        <p>Murmur is designed so transcription, search, and local AI can run <b>without a network at all</b>. If you choose cloud AI, consent and a redaction firewall sit in front of that egress.</p>
+        <p>Murmur is designed so transcription, search, and local AI can run <b>with no network at all</b> — once you switch off the one thing that does reach out: a launch-time check for a new version. If you choose cloud AI, consent and a redaction firewall sit in front of that egress.</p>
       </div>
 
       <div class="privacy-grid">
         <div class="pcard green reveal">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="m3 3 18 18"/></svg></div>
           <h3>Nothing leaves the device</h3>
-          <p>With the bundled on-device model or Ollama, your audio and transcripts never touch a network. The reasoning happens on your Mac.</p>
+          <p>With an on-device model you download once, or Ollama, your audio and transcripts never touch a network. The reasoning happens on your Mac.</p>
         </div>
         <div class="pcard reveal">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
@@ -628,7 +653,12 @@
         <div class="pcard green reveal">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.5 8 8 11 4.5-3 8-6 8-11V5z"/><path d="M9 12h6M12 9v6" opacity=".5"/></svg></div>
           <h3>Redaction firewall</h3>
-          <p>If you ever opt into a cloud summarizer, emails, phone and card-like numbers are scrubbed first — and cloud egress is <b>fail-closed</b> behind a one-time consent.</p>
+          <p>If you ever opt into a cloud summarizer, emails, card-like numbers and phone numbers are scrubbed first — and cloud egress is <b>fail-closed</b> behind a one-time consent. Download the optional name-masking model and people&rsquo;s names are replaced too.</p>
+        </div>
+        <div class="pcard wide reveal">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></div>
+          <h3>The one call we make by default</h3>
+          <p>At launch Murmur asks GitHub whether a newer version exists. The request says which version of Murmur you are running, because that is how it asks the question — and nothing else: no meetings, no notes, no account. You can switch it off in <b>Settings &rarr; Privacy</b>. It is the only thing on this page that happens without you asking for it, which is exactly why it is on this page.</p>
         </div>
       </div>
 
@@ -649,8 +679,8 @@
             </tbody>
           </table>
         </div>
-        <div class="shot" style="margin-top:32px"><img src="./assets/settings-privacy.png" alt="Murmur's privacy settings, stating in plain language what is removed before any text leaves, which providers are cloud, and that cloud processing is off until you allow it once" loading="lazy" /></div>
-        <div class="egress-foot">Murmur tells you, in plain language, exactly what leaves your Mac — and defaults to keeping it all on-device. One model picker is used across every AI surface, and it always accepts a model id you type yourself — so a model released after this build still works.</div>
+        <div class="shot" style="margin-top:32px"><img data-shot="settings-privacy" src="./assets/settings-privacy.png" alt="Murmur's privacy settings, stating in plain language what is removed before any text leaves, which providers are cloud, and that cloud processing is off until you allow it once" loading="lazy" /></div>
+        <div class="egress-foot">Murmur tells you, in plain language, exactly what leaves your Mac — and every cloud AI call is logged and shown back to you. Your meetings stay on-device unless you opt in. One model picker is used across every AI surface, and it always accepts a model id you type yourself — so a model released after this build still works.</div>
       </div>
     </div>
   </section>
@@ -668,22 +698,22 @@
       <div class="section-head reveal" style="margin-top:8px">
         <span class="eyebrow">Structure</span>
         <h2>One hierarchy. Boards over it. And a door in.</h2>
-        <p>2.0 rebuilt the shell around a single tree, added composable boards on top of it, and opened an offline import path for the notes you already have somewhere else.</p>
+        <p>Murmur is built around a single tree, with composable boards on top of it, and an offline import path for the notes you already have somewhere else.</p>
       </div>
 
       <div class="feature reveal">
         <div class="ftext">
           <span class="eyebrow">Workspaces</span>
           <h3>One tree for everything</h3>
-          <p>The separate Meetings and Notes folder trees are gone. There's now a single tree — <b>Workspaces › folders › your recordings and notes</b> — in one sidebar that collapses to a rail when you want the room. Lock a workspace and everything inside it is sealed with it.</p>
+          <p>The separate Meetings and Notes folder trees are gone. There's now a single tree — <b>Workspaces › folders › your recordings and notes</b> — in one sidebar that collapses to a rail when you want the room. Lock a Workspace and everything inside it is sealed with it.</p>
           <ul class="flist">
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Recordings, notes, tasks and boards file into the same place</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> A sealed workspace shows its name and nothing else — no counts, no contents</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> A sealed Workspace shows its name and nothing else — no counts, no contents</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Ask the Brain to file a stray recording for you</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Deleted by mistake? Trash keeps it for 30 days</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Deleted by mistake? Trash keeps it for 30 days — or however long you set, up to a year</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/hero-spaces.png" alt="The Workspaces sidebar: one tree of workspaces and folders holding recordings, notes and boards, with a locked workspace at the bottom" loading="lazy" /></div>
+        <div class="shot"><img data-shot="hero-spaces" src="./assets/hero-spaces.png" alt="The Workspaces sidebar: one tree of Workspaces and folders holding recordings, notes and boards, with a locked Workspace at the bottom" loading="lazy" /></div>
       </div>
 
       <div class="feature flip reveal">
@@ -692,12 +722,12 @@
           <h3>Boards you compose</h3>
           <p>Pull notes, recordings, documents, people, promise ledgers and reminders onto a board, then read it through <b>Brief / Overview / Commitments / Sources / People</b> lenses. Pin a <b>living answer</b> — a question the app keeps up to date, and withholds the moment its sources stop being readable. You can ask a board directly, grounded only in what's on it.</p>
           <ul class="flist">
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Ten kinds of tile, including drift, numbers and activity pulse</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Seven kinds of tile you can add — a note, a recording, a document, a person, a promise ledger, a reminders list, or a living answer</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Five lenses over the same tiles — no second copy of anything</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> A board states its own boundary: what it can read, and what it derived</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/dashboard.png" alt="A board in its Brief lens: a pinned living answer, what needs attention, and the recent evidence behind it" loading="lazy" /></div>
+        <div class="shot"><img data-shot="dashboard" src="./assets/dashboard.png" alt="A board in its Brief lens: a pinned living answer, what needs attention, and the recent evidence behind it" loading="lazy" /></div>
       </div>
 
       <div class="feature reveal">
@@ -708,10 +738,10 @@
           <ul class="flist">
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Three sources: a Notion export, an Obsidian vault, Apple Notes</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Dry run first — nothing is written until you say so</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Imported notes land in their own named container, and join the same Brain</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Imported notes land in their own named folder, and join the same Brain</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/settings-imports.png" alt="Settings → Imports: Notion, Obsidian and Apple Notes, with the note that everything happens on this Mac and nothing is uploaded" loading="lazy" /></div>
+        <div class="shot"><img data-shot="settings-imports" src="./assets/settings-imports.png" alt="Settings → Imports: Notion, Obsidian and Apple Notes, with the note that everything happens on this Mac and nothing is uploaded" loading="lazy" /></div>
       </div>
 
       <!-- Feature 1 -->
@@ -724,14 +754,30 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> On-device reasoner (Bielik-11B, Qwen) via Metal</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Grounded, not hallucinated — retrieved from your own transcripts</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Optional consent-gated web — off by default</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Conversations are remembered — vault, note and meeting threads persist, with a history browser on each surface. A conversation disappears the instant any folder it drew on stops being readable.</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/ask.png" alt="Asking across months of meetings and getting one answer, with the meetings it was drawn from listed underneath" loading="lazy" /></div>
+        <div class="shot"><img data-shot="record-brain" src="./assets/record-brain.png" alt="A recording in progress with a question asked mid-meeting, answered live from the meeting memory with the sources it drew on" loading="lazy" /></div>
+      </div>
+
+      <!-- Ask, at vault scale — the surface ask.png actually shows. Scoping is
+           #689 (commands/ask.rs::scope_folder_ids), resolved by id so a rename
+           does not silently widen the answer. -->
+      <div class="feature reveal">
+        <div class="ftext">
+          <span class="eyebrow">Ask your vault</span>
+          <h3>Ask across months of calls.</h3>
+          <p>The same brain, pointed at everything you have ever recorded and written. Every answer arrives with the meetings and notes it was drawn from, so you can open the source instead of taking its word.</p>
+          <ul class="flist">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Narrow a question to one Workspace or folder — the whole subtree, and nothing outside it</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Conversations are remembered — vault, note and meeting threads persist, with a history browser on each surface</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> A conversation disappears the instant any folder it drew on stops being readable</li>
+          </ul>
+        </div>
+        <div class="shot"><img data-shot="ask" src="./assets/ask.png" alt="Asking across months of meetings and getting one answer, with the meetings it was drawn from listed underneath" loading="lazy" /></div>
       </div>
 
       <!-- Feature 2 -->
-      <div class="feature reveal">
+      <div class="feature flip reveal">
         <div class="ftext">
           <span class="eyebrow">Capture &amp; transcribe</span>
           <h3>It hears both sides of the call.</h3>
@@ -742,27 +788,28 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> A floating recorder bar — record from anywhere (⌘⇧R)</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/transcript.png" alt="The merged Me / Others transcript, time-indexed, beside the speaker and topic timeline" loading="lazy" /></div>
+        <div class="shot"><img data-shot="transcript" src="./assets/transcript.png" alt="The merged Me / Others transcript, time-indexed, beside the speaker and topic timeline" loading="lazy" /></div>
       </div>
 
       <!-- Feature 3 -->
-      <div class="feature flip reveal">
+      <div class="feature reveal">
         <div class="ftext">
           <span class="eyebrow">Notes &amp; memory</span>
           <h3>Structured notes and a graph that builds itself.</h3>
-          <p>Every call becomes a clean note — summary, decisions, action items, quotes. Recordings and notes live side by side in the same workspace. People and projects are extracted automatically into a knowledge graph, and sealed Spaces stay hidden from it.</p>
+          <p>Every call becomes a clean note — summary, decisions, action items, quotes. Recordings and notes live side by side in the same Workspace. People and projects are extracted automatically into a knowledge graph, and sealed Workspaces stay hidden from it.</p>
           <ul class="flist">
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Ask across every meeting with hybrid semantic search</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Entity dossiers, related meetings, weekly digests</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Action items can push to Apple Reminders</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Private reminders that never leave the Mac, each linked back to the recording or note it came from — the brain proposes, you accept</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Action items can also push to Apple Reminders</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Feed it PDFs, Office docs, web pages &amp; images — chunked into the same brain, on-device</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/full-brain-graph.png" alt="The full brain graph — meetings, notes, documents and people as one map, with typed links between them" loading="lazy" /></div>
+        <div class="shot"><img data-shot="full-brain-graph" src="./assets/full-brain-graph.png" alt="The full brain graph — meetings, notes, documents and people as one map, with typed links between them" loading="lazy" /></div>
       </div>
 
       <!-- Feature: Receipts -->
-      <div class="feature reveal">
+      <div class="feature flip reveal">
         <div class="ftext">
           <span class="eyebrow">Receipts</span>
           <h3>Every claim traces back to the tape.</h3>
@@ -770,14 +817,15 @@
           <ul class="flist">
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Click a claim, hear exactly where it came from</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Speaker + ASR-confidence on every receipt</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Seven one-click artifacts from any meeting — follow-up email, decision log, work ticket, 1:1 recap, standup, sales recap, interview notes</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Sealed folders leak no timing or speaker, ever</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/detail-receipts.png" alt="A generated note's receipts: one row per grounded claim, each carrying the speaker and the second of audio it came from" loading="lazy" /></div>
+        <div class="shot"><img data-shot="detail-receipts" src="./assets/detail-receipts.png" alt="A generated note's receipts: one row per grounded claim, each carrying the speaker and the second of audio it came from" loading="lazy" /></div>
       </div>
 
       <!-- Feature 4 -->
-      <div class="feature flip reveal">
+      <div class="feature reveal">
         <div class="ftext">
           <span class="eyebrow">Yours to keep</span>
           <h3>Plain Markdown. No lock-in.</h3>
@@ -788,26 +836,26 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Plain Markdown exports you can open in any editor</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/detail-note.png" alt="A structured note — summary, decisions, action items and quotes — beside the recordings and notes it links to" loading="lazy" /></div>
+        <div class="shot"><img data-shot="detail-note" src="./assets/detail-note.png" alt="A structured note — summary, decisions, action items and quotes — beside the recordings and notes it links to" loading="lazy" /></div>
       </div>
 
       <!-- Feature 5 -->
-      <div class="feature reveal">
+      <div class="feature flip reveal">
         <div class="ftext">
           <span class="eyebrow">Notes</span>
           <h3>Not just meeting notes. All your notes.</h3>
-          <p>A full Markdown editor with tags and properties, filed in the same workspaces as your recordings — for anything you write, not just what Murmur transcribes. Select any passage and a command menu appears: refine, shorten, change tone, translate, fact-check, or just type what you want done.</p>
+          <p>A full Markdown editor with tags and properties, filed in the same Workspaces as your recordings — for anything you write, not just what Murmur transcribes. Select any passage and a command menu appears: refine, shorten, change tone, translate, fact-check, or just type what you want done.</p>
           <ul class="flist">
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Nineteen Brain actions, one keystroke away</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Grounded in your own meetings &amp; notes, not the model's guesses</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Paste screenshots into notes; they stay local and follow the workspace's lock</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Paste screenshots into notes; they stay local and follow the Workspace&rsquo;s lock</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/notes-editor-brain-menu.png" alt="The standalone note editor with a text selection and the Brain command menu open, showing Refine, Shorten, Change tone and more actions" loading="lazy" /></div>
+        <div class="shot"><img data-shot="notes-editor-brain-menu" src="./assets/notes-editor-brain-menu.png" alt="The standalone note editor with a text selection and the Brain command menu open, showing Refine, Shorten, Change tone and more actions" loading="lazy" /></div>
       </div>
 
       <!-- Feature 6 -->
-      <div class="feature flip reveal">
+      <div class="feature reveal">
         <div class="ftext">
           <span class="eyebrow">Shared Brain</span>
           <h3>Work as a team, still end-to-end encrypted.</h3>
@@ -820,7 +868,7 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Shared <b>Tasks</b> — assignees, due dates, subtasks and the same permissions. Tasks live inside an org, so they need a signed-in account.</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/shared-brains.png" alt="The Shared Brains view: meetings and notes your organizations have shared with you, each with its author and organization" loading="lazy" /></div>
+        <div class="shot"><img data-shot="shared-brains" src="./assets/shared-brains.png" alt="The Shared Brains view: meetings and notes your organizations have shared with you, each with its author and organization" loading="lazy" /></div>
       </div>
     </div>
   </section>
@@ -847,8 +895,8 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Standalone notes with a Brain-assisted editor</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> E2EE sharing with per-document View only / Can edit (account required)</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Workspaces, composable dashboards, and offline Notion / Obsidian / Apple Notes import</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Expiring, encrypted share links for a note or meeting</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Per-workspace and per-folder Touch ID lock &amp; AES-256 encryption</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Encrypted share links with an expiry, an optional password and an open-count cap</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Per-Workspace and per-folder Touch ID lock &amp; AES-256 encryption</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Screen-share auto-relock</li>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Local MCP server + Markdown export</li>
           </ul>
@@ -957,8 +1005,36 @@
       var KEY = "murmur-theme";
       var root = document.documentElement;
       var sw = document.querySelector(".theme-switch");
+      // Screenshots follow the theme. A dark app pictured on a light page is the
+      // single loudest way a product page can look unmaintained — and the capture
+      // harness now emits `<name>-light.png` beside every shot for exactly this.
+      // Only ONE file per shot is ever fetched: the src is repointed, not doubled
+      // up with a hidden second <img>.
+      function applyShots(mode) {
+        var light = mode === "light" ||
+          (mode === "system" && window.matchMedia &&
+           window.matchMedia("(prefers-color-scheme: light)").matches);
+        var imgs = document.querySelectorAll("img[data-shot]");
+        for (var i = 0; i < imgs.length; i++) {
+          var el = imgs[i];
+          var name = el.getAttribute("data-shot");
+          var want = "./assets/" + name + (light ? "-light" : "") + ".png";
+          if (el.getAttribute("src") === want) continue;
+          // A light capture that has not been taken yet must not leave a broken
+          // image on the page — fall back to the dark file that always exists.
+          if (light && !el.hasAttribute("data-shot-fallback")) {
+            el.setAttribute("data-shot-fallback", "1");
+            el.addEventListener("error", function () {
+              this.setAttribute("src", "./assets/" + this.getAttribute("data-shot") + ".png");
+            });
+          }
+          el.setAttribute("src", want);
+        }
+      }
+
       function apply(mode) {
         root.setAttribute("data-theme", mode);
+        applyShots(mode);
         if (!sw) return;
         var btns = sw.querySelectorAll("button");
         for (var i = 0; i < btns.length; i++) {
@@ -970,6 +1046,14 @@
       var saved = "system";
       try { saved = localStorage.getItem(KEY) || "system"; } catch (e) {}
       apply(saved);
+      // Follow the OS while the mode is "system" — otherwise a reader who flips
+      // macOS to light keeps a page of dark screenshots.
+      if (window.matchMedia) {
+        var mq = window.matchMedia("(prefers-color-scheme: light)");
+        var onMq = function () { if (root.getAttribute("data-theme") === "system") applyShots("system"); };
+        if (mq.addEventListener) mq.addEventListener("change", onMq);
+        else if (mq.addListener) mq.addListener(onMq);
+      }
       if (sw) {
         sw.addEventListener("click", function (e) {
           var btn = e.target.closest ? e.target.closest("button[data-theme-set]") : null;

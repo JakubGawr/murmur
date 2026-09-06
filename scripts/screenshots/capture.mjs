@@ -3,13 +3,21 @@
  *
  * Renders the REAL shipping Angular UI (ng serve) over a mocked Tauri IPC layer
  * plus a privacy-safe demo world (./mock-tauri.js), then captures each screen at
- * 2× retina in the dark theme. No real vault / DB / mic / network is touched —
- * see ./README.md.
+ * 2× retina. No real vault / DB / mic / network is touched — see ./README.md.
+ *
+ * THEMES. The app defaults to `system` (ThemeService.read()), and its light tokens
+ * key on `prefers-color-scheme` in that mode (design-tokens/theme-light.css) — so
+ * the browser's colour scheme is the whole switch, and no app state is touched to
+ * get a light capture. A light shot is written as `<name>-light.png` beside the
+ * dark one, which is what lets the landing page swap screenshots with its own
+ * theme switch instead of showing a dark app on a light page.
  *
  * Usage:
  *   PLAYWRIGHT_PATH=<npx-cache>/node_modules/playwright node scripts/screenshots/capture.mjs [name...]
  * (the wrapper ./run.sh resolves PLAYWRIGHT_PATH for you). Pass shot names to
  * capture a subset, e.g. `... capture.mjs dashboard tasks`.
+ *
+ *   MURMUR_SHOT_THEME=dark|light|both   (default: both)
  *
  * TWO GUARANTEES THIS FILE ENFORCES, because a marketing image is published and
  * cannot be un-published:
@@ -38,6 +46,20 @@ const OUT = process.env.MURMUR_SHOT_DIR || join(ROOT, "docs", "screenshots");
 const MOCK = readFileSync(join(__dirname, "mock-tauri.js"), "utf8");
 const BASE = process.env.MURMUR_URL || "http://localhost:1420";
 const VERSION = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).version;
+
+/** Which colour schemes to capture. `both` is the default: a set that is half
+ *  refreshed is worse than one that is uniformly old, because nothing on the page
+ *  tells you which half. */
+const THEMES = (() => {
+  const v = (process.env.MURMUR_SHOT_THEME || "both").toLowerCase();
+  if (v === "dark" || v === "light") return [v];
+  if (v === "both") return ["dark", "light"];
+  console.error(`✗ MURMUR_SHOT_THEME must be dark | light | both (got "${v}")`);
+  process.exit(1);
+})();
+
+/** Dark keeps the bare name so every existing reference to a shot still resolves. */
+const shotFile = (name, theme) => (theme === "light" ? `${name}-light` : name);
 
 const EVENT_STATUS = "meetnotes://status";
 const EVENT_LIVE_CAPTION = "murmur://live-caption";
@@ -77,6 +99,32 @@ const EMAIL_ALLOW = /@(sonora|example)(\.|$|\b)/i;
  * the shot is publishable. Reads `innerText` (what a reader sees) plus the
  * document title (what the window chrome shows).
  */
+/**
+ * The value of `--surface-base` in each theme (design-tokens/colors.css and
+ * theme-light.css). Read off the live app rather than trusted from here — this
+ * is only the expectation to compare against.
+ */
+const THEME_BASE = { dark: "#07070b", light: "#f3f3f8" };
+
+/**
+ * Did the page actually render in the theme we asked for?
+ *
+ * WHY THIS EXISTS. The driver setting `colorScheme` on the context is NOT
+ * sufficient on its own: mock-tauri.js pins `murmur-theme` in localStorage, and
+ * while it pinned "dark" unconditionally the first light run produced 30 files
+ * byte-identical to their dark counterparts — and reported "60/60 shots
+ * captured". A wrong screenshot under a right filename is worse than a missing
+ * one, because nothing downstream can tell. Returns "" when it matches.
+ */
+async function themeMismatch(page, theme) {
+  const base = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--surface-base").trim(),
+  );
+  if (!base) return `--surface-base is empty (tokens did not load?)`;
+  const want = THEME_BASE[theme];
+  return base.toLowerCase() === want ? "" : `rendered --surface-base ${base}, expected ${want} for ${theme}`;
+}
+
 async function privacyViolations(page) {
   const { text, title } = await page.evaluate(() => ({
     text: document.body ? document.body.innerText || "" : "",
@@ -112,13 +160,51 @@ async function liveCaption(page, text) {
   await page.evaluate(([evt, t]) => window.__demoEmit(evt, { text: t }), [EVENT_LIVE_CAPTION, text]);
 }
 
-/** Open one of the shell's two context panels ("Spaces" / "Browse"). */
+/**
+ * Open one of the shell's sidebar sections.
+ *
+ * REWRITTEN against the shipping shell. This targeted `nav.global-rail` and an
+ * `aria-pressed` panel toggle; neither exists any more (`nav.global-rail` matches
+ * ZERO elements today), so every shot that called it timed out and was skipped —
+ * silently, because a per-shot exception is caught and the run continues. That is
+ * how `hero-spaces`, `spaces-locked` and `library` quietly kept shipping images
+ * from a build four releases old.
+ *
+ * The shell now has two navs, and they behave differently:
+ *  - `nav.sb-nav` holds Workspaces / Shared, and ONLY while the sidebar is
+ *    COLLAPSED — clicking one expands the sidebar and removes the button. The
+ *    sidebar defaults to expanded (app-shell.component.ts, readStoredBoolean(...,
+ *    true)), so an absent button means the panel is already open. Waiting for it
+ *    is precisely the bug.
+ *  - `nav.sb-browse` is a disclosure carrying `aria-expanded`, defaulting to
+ *    false, whose sublist also needs the sidebar expanded.
+ */
 async function openPanel(page, label) {
-  const btn = page.locator(`nav.global-rail button[aria-label="${label}"]`);
-  await btn.waitFor({ timeout: 10_000 });
-  const pressed = await btn.getAttribute("aria-pressed");
-  if (pressed !== "true") await btn.click();
-  await settle(page, 500);
+  if (label === "Browse") {
+    await expandSidebar(page);
+    const btn = page.locator('nav.sb-browse button[aria-label="Browse"]');
+    await btn.waitFor({ timeout: 10_000 });
+    if ((await btn.getAttribute("aria-expanded")) !== "true") await btn.click();
+    await settle(page, 500);
+    return;
+  }
+  // Workspaces / Shared: present only while collapsed, so clicking is what OPENS
+  // them and absence is success, not failure.
+  const btn = page.locator(`nav.sb-nav button[aria-label="${label}"]`);
+  if (await btn.count()) {
+    await btn.click();
+    await settle(page, 500);
+  }
+}
+
+/** Make sure the sidebar is expanded (it is by default; a stored preference can differ). */
+async function expandSidebar(page) {
+  if (!(await page.locator(".sidebar-collapsed").count())) return;
+  const btn = page.locator('nav.sb-nav button[aria-label="Workspaces"]');
+  if (await btn.count()) {
+    await btn.click();
+    await settle(page, 400);
+  }
 }
 
 /**
@@ -171,7 +257,7 @@ const SHOTS = {
     viewport: APP,
     async run(page) {
       await goto(page, "/container/f-atlas");
-      await openPanel(page, "Spaces");
+      await openPanel(page, "Workspaces");
       await settle(page, 900);
     },
   },
@@ -182,7 +268,7 @@ const SHOTS = {
     viewport: { width: 1440, height: 640 },
     async run(page) {
       await goto(page, "/container/f-personal");
-      await openPanel(page, "Spaces");
+      await openPanel(page, "Workspaces");
       await settle(page, 900);
     },
   },
@@ -400,6 +486,11 @@ const SHOTS = {
     viewport: APP,
     async run(page) {
       await goto(page, "/notes/n-atlas-prd");
+      // A note WITH A BODY now opens in Preview, not Edit (a8eca7bd,
+      // "open a note that has a body in Preview") — so there is no textarea at
+      // all until the segmented control is switched back. This shot waited 15s
+      // for `textarea.body-area` and was skipped on every run after that landed.
+      await page.locator('.head-seg button[aria-label="Edit"]').click({ timeout: 15_000 });
       await page.waitForSelector("textarea.body-area", { timeout: 15_000 });
       await settle(page, 900);
       // The editor body is a textarea; the selection bubble is raised by
@@ -410,8 +501,13 @@ const SHOTS = {
         const el = document.querySelector("textarea.body-area");
         if (!el) return;
         const body = el.value;
-        // A sentence in the middle of the note reads better than the H1.
-        const start = Math.max(0, body.indexOf("p95"));
+        // A sentence in the middle of the note reads better than the H1. The old
+        // anchor ("p95") is no longer in the demo note, and `indexOf` returning
+        // -1 silently became `start = 0` — i.e. it quietly selected the H1, the
+        // one thing the line above says not to. Fail loudly instead.
+        const ANCHOR = "This revision folds in";
+        const start = body.indexOf(ANCHOR);
+        if (start < 0) throw new Error(`selection anchor ${JSON.stringify(ANCHOR)} is not in the demo note`);
         const dot = body.indexOf(".", start);
         el.focus();
         el.setSelectionRange(start, dot > start ? dot + 1 : Math.min(body.length, start + 120));
@@ -530,6 +626,9 @@ const SHOTS = {
   // that reuses the app's tokens and its brand mark, so the header image cannot
   // drift from the product the way the hand-drawn one did.
   banner: {
+    // Dark only: banner.html carries its own palette and never follows the app
+    // theme, so a light capture would just be this image under a lighter name.
+    themes: ["dark"],
     viewport: { width: 1280, height: 448 },
     async run(page) {
       await page.goto(`file://${join(__dirname, "banner.html")}`, { waitUntil: "load" });
@@ -551,17 +650,29 @@ async function main() {
   const names = wanted.length ? wanted : Object.keys(SHOTS);
   const browser = await chromium.launch();
   let ok = 0;
+  let planned = 0;
   const refused = [];
+  const wrongTheme = [];
+  const jobs = [];
   for (const name of names) {
-    const shot = SHOTS[name];
-    if (!shot) {
+    if (!SHOTS[name]) {
       console.error(`✗ unknown shot: ${name}`);
       continue;
     }
+    // A shot may opt out of a theme (see `banner`).
+    const allowed = SHOTS[name].themes;
+    for (const theme of THEMES) {
+      if (allowed && !allowed.includes(theme)) continue;
+      jobs.push([name, theme]);
+    }
+  }
+  planned = jobs.length;
+  for (const [name, theme] of jobs) {
+    const shot = SHOTS[name];
     const ctx = await browser.newContext({
       viewport: shot.viewport,
       deviceScaleFactor: 2,
-      colorScheme: "dark",
+      colorScheme: theme,
       locale: "en-US",
     });
     const page = await ctx.newPage();
@@ -573,6 +684,9 @@ async function main() {
     // boards, tasks, ask grounding). They are opt-in because this mock is also the
     // e2e suite's base fixture — see the SHARED FIXTURE WARNING in mock-tauri.js.
     await page.addInitScript("window.__demoRich = true;");
+    // MUST precede the mock: mock-tauri.js reads this to pin `murmur-theme`, and
+    // without it the app boots dark no matter what colour scheme the context has.
+    await page.addInitScript(`window.__demoTheme = ${JSON.stringify(theme)};`);
     await page.addInitScript(`window.__demoVersion = ${JSON.stringify(VERSION)};`);
     await page.addInitScript(MOCK);
     if (shot.config) {
@@ -580,26 +694,36 @@ async function main() {
     }
     try {
       await shot.run(page);
-      const leaks = await privacyViolations(page);
-      if (leaks.length) {
-        refused.push(name);
-        console.error(`⛔ ${name}: REFUSED — ${leaks.join("; ")}`);
+      const mismatch = await themeMismatch(page, theme);
+      if (mismatch) {
+        wrongTheme.push(`${name} (${theme})`);
+        console.error(`⛔ ${name} [${theme}]: WRONG THEME — ${mismatch}`);
         continue;
       }
-      const out = join(OUT, `${name}.png`);
+      const leaks = await privacyViolations(page);
+      if (leaks.length) {
+        refused.push(`${name} (${theme})`);
+        console.error(`⛔ ${name} [${theme}]: REFUSED — ${leaks.join("; ")}`);
+        continue;
+      }
+      const out = join(OUT, `${shotFile(name, theme)}.png`);
       await page.screenshot({ path: out });
-      console.log(`✓ ${name} → ${out}${errs.length ? `  (console errors: ${errs.length})` : ""}`);
+      console.log(`✓ ${name} [${theme}] → ${out}${errs.length ? `  (console errors: ${errs.length})` : ""}`);
       ok++;
     } catch (e) {
-      console.error(`✗ ${name}: ${e.message.split("\n")[0]}`);
+      console.error(`✗ ${name} [${theme}]: ${e.message.split("\n")[0]}`);
     } finally {
       await ctx.close();
     }
   }
   await browser.close();
-  console.log(`\n${ok}/${names.length} shots captured → ${OUT}`);
+  console.log(`\n${ok}/${planned} shots captured (${THEMES.join(" + ")}) → ${OUT}`);
   if (refused.length) {
     console.error(`REFUSED for privacy: ${refused.join(", ")}`);
+    process.exitCode = 1;
+  }
+  if (wrongTheme.length) {
+    console.error(`REFUSED for wrong theme: ${wrongTheme.join(", ")}`);
     process.exitCode = 1;
   }
 }
