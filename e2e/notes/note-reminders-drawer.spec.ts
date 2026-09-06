@@ -117,7 +117,7 @@ test("the note's Reminders drawer lists ONLY reminders anchored to this note", a
   expect(consoleErrors).toEqual([]);
 });
 
-test("the row's circle carries completion state, and a done one cannot be un-done", async ({
+test("the row's circle carries completion state and toggles BOTH ways", async ({
   page,
 }) => {
   await mockNotes(page, {}, [], { list_reminders: REMINDERS_FIXTURE });
@@ -131,14 +131,34 @@ test("the row's circle carries completion state, and a done one cannot be un-don
   await expect(open).toHaveAttribute("aria-checked", "false");
   await expect(open).toBeEnabled();
 
-  // There is no command to reopen a reminder — `ReminderDraft` carries no state
-  // — so the finished circle must be a DISABLED checkbox rather than a control
-  // that looks live and does nothing when clicked.
+  // A finished one is still a live control: ticking something off by mistake has
+  // to be undoable, which is what `reopen_reminder` exists for. Its label says
+  // what a click WILL do, not what the row currently is.
   const done = page.getByRole("checkbox", {
-    name: "Completed: Already handled on this note",
+    name: "Mark Already handled on this note as not done",
   });
   await expect(done).toHaveAttribute("aria-checked", "true");
-  await expect(done).toBeDisabled();
+  await expect(done).toBeEnabled();
+
+  // And it calls the reopen command, not complete — the direction is read from
+  // the reminder's own state, so a row rendered in the wrong group cannot send
+  // the wrong action.
+  const calls: string[] = [];
+  await page.exposeFunction("__recordReminderCall", (cmd: string) => {
+    calls.push(cmd);
+  });
+  await page.evaluate(() => {
+    const internals = (window as any).__TAURI_INTERNALS__;
+    const real = internals.invoke.bind(internals);
+    internals.invoke = (cmd: string, args: unknown) => {
+      if (cmd === "reopen_reminder" || cmd === "complete_reminder") {
+        (window as any).__recordReminderCall(cmd);
+      }
+      return real(cmd, args);
+    };
+  });
+  await done.click();
+  await expect.poll(() => calls).toEqual(["reopen_reminder"]);
 
   // The strikethrough is the sighted half of that same state.
   const struck = await page

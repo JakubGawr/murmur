@@ -608,6 +608,80 @@ fn one_off_completion_is_idempotent_and_terminal() {
 }
 
 #[test]
+fn reopening_a_completed_reminder_makes_it_an_open_item_again() {
+    let db = reminder_db();
+    db.create_reminder("r1", &draft(10), ReminderOrigin::Manual, 1)
+        .unwrap();
+    assert!(db.complete_reminder("r1", 10, 20).unwrap());
+    assert_eq!(db.due_reminder_count().unwrap(), 0);
+
+    assert!(db.reopen_reminder("r1", 10, 30).unwrap());
+    let stored = db.get_stored_reminder("r1").unwrap().unwrap();
+    assert_eq!(stored.state, ReminderState::Active);
+    assert_eq!(stored.completed_at, None, "reopening must clear the finish time");
+    assert_eq!(stored.due_at, 10, "reopening restores the item, it does not reschedule it");
+
+    // The regression this guards: `materialize_due_reminders` inserts OR IGNORE, so a completed
+    // occurrence left behind would keep an overdue reminder out of the Inbox FOREVER — active on
+    // paper and invisible where the user looks for it.
+    assert_eq!(db.materialize_due_reminders(40).unwrap(), 1);
+    assert_eq!(db.due_reminder_count().unwrap(), 1);
+
+    // Idempotent: a replayed click cannot reopen twice.
+    assert!(!db.reopen_reminder("r1", 10, 50).unwrap());
+}
+
+#[test]
+fn reopening_something_finished_early_does_not_put_it_in_the_inbox() {
+    let db = reminder_db();
+    // Due in the future, ticked off ahead of time — `complete_reminder` still writes an occurrence
+    // at that future due_at, so a reopen that merely flipped it back to unread would show a
+    // not-yet-due reminder in the Inbox. Deleting it instead hands the decision to the
+    // materializer, which only creates occurrences for due_at that has actually passed.
+    db.create_reminder("r1", &draft(1_000), ReminderOrigin::Manual, 1)
+        .unwrap();
+    assert!(db.complete_reminder("r1", 1_000, 100).unwrap());
+    assert!(db.reopen_reminder("r1", 1_000, 200).unwrap());
+
+    assert_eq!(db.materialize_due_reminders(300).unwrap(), 0);
+    assert_eq!(db.due_reminder_count().unwrap(), 0);
+    assert_eq!(
+        db.lock()
+            .query_row(
+                "SELECT COUNT(*) FROM reminder_due_occurrences WHERE reminder_id='r1'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap(),
+        0
+    );
+
+    // Once it really is due, it materializes normally.
+    assert_eq!(db.materialize_due_reminders(1_500).unwrap(), 1);
+    assert_eq!(db.due_reminder_count().unwrap(), 1);
+}
+
+#[test]
+fn reopening_refuses_a_stale_schedule_generation_and_an_active_reminder() {
+    let db = reminder_db();
+    db.create_reminder("r1", &draft(10), ReminderOrigin::Manual, 1)
+        .unwrap();
+    assert!(
+        !db.reopen_reminder("r1", 10, 20).unwrap(),
+        "an ACTIVE reminder has nothing to reopen"
+    );
+    assert!(db.complete_reminder("r1", 10, 20).unwrap());
+    assert!(
+        !db.reopen_reminder("r1", 11, 30).unwrap(),
+        "a due_at the caller no longer shares must not be reopened"
+    );
+    assert_eq!(
+        db.get_stored_reminder("r1").unwrap().unwrap().state,
+        ReminderState::Completed
+    );
+}
+
+#[test]
 fn recurring_completion_advances_once_and_months_clamp_to_valid_dates() {
     let db = reminder_db();
     let due = Local

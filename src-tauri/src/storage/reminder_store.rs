@@ -1316,6 +1316,49 @@ impl Db {
         Ok(true)
     }
 
+    /// Reopen a completed reminder: it becomes an open item again at the same due time.
+    ///
+    /// The inverse of `complete_reminder`, and deliberately NOT a general undo. Completing a
+    /// RECURRING reminder ADVANCES the series and leaves it active, so the only recurring rows
+    /// that can reach a completed state are series that ran out of representable dates before the
+    /// 2200 horizon. Reopening one of those restores that final occurrence; it cannot resurrect a
+    /// schedule that has no next date to go to.
+    ///
+    /// The occurrence row is DELETED rather than flipped back to `unread`, and that is the whole
+    /// subtlety here. `materialize_due_reminders` inserts OR IGNORE, so a row left at `completed`
+    /// would keep an overdue reminder out of the Inbox permanently — but flipping it to `unread`
+    /// unconditionally would be wrong in the other direction, because `complete_reminder` writes
+    /// an occurrence even when the user finishes something EARLY, and resurrecting that row would
+    /// put a not-yet-due reminder in the Inbox. Deleting it hands the decision back to the
+    /// materializer, which already knows the rule: an occurrence exists exactly when `due_at` has
+    /// passed.
+    ///
+    /// `expected_due_at` is the same stale-UI guard `complete_reminder` uses. `false` means the
+    /// row moved under the caller — already reopened, a replay, or a different schedule
+    /// generation — never a silent partial write.
+    pub fn reopen_reminder(&self, id: &str, expected_due_at: i64, now: i64) -> Result<bool> {
+        let mut conn = self.lock();
+        let tx = conn.transaction().map_err(map_err)?;
+        let changed = tx
+            .execute(
+                "UPDATE reminders
+                    SET state='active', completed_at=NULL, updated_at=?3
+                  WHERE id=?1 AND due_at=?2 AND state='completed'",
+                rusqlite::params![id, expected_due_at, now],
+            )
+            .map_err(map_err)?;
+        if changed == 0 {
+            return Ok(false);
+        }
+        tx.execute(
+            "DELETE FROM reminder_due_occurrences WHERE reminder_id=?1 AND due_at=?2",
+            rusqlite::params![id, expected_due_at],
+        )
+        .map_err(map_err)?;
+        tx.commit().map_err(map_err)?;
+        Ok(true)
+    }
+
     /// Dismiss one exact unread occurrence. For a recurring series, dismissal acknowledges the
     /// current schedule generation and advances it exactly once to the first future recurrence.
     /// The occurrence status and schedule CAS share one transaction, so replaying the same UI

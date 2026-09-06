@@ -375,6 +375,12 @@ export class RemindersStore {
     );
   }
 
+  async reopen(reminderId: string, expectedDueAt: number): Promise<void> {
+    await this.confirmThenRefresh(reminderId, () =>
+      this.ipc.reopenMurmurReminder(reminderId, expectedDueAt),
+    );
+  }
+
   async dismissOccurrence(occurrenceId: string): Promise<void> {
     await this.confirmThenRefresh(occurrenceId, () =>
       this.ipc.dismissMurmurReminderOccurrence(occurrenceId),

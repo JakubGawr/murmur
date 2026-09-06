@@ -124,8 +124,16 @@ export class NoteRemindersPanelComponent {
     this.composer.openEdit(reminder);
   }
 
-  async complete(row: ReminderRowVm): Promise<void> {
-    await this.store.complete(row.reminder.id, row.expectedDueAt).catch(() => {
+  /** The circle, both ways. A finished reminder goes back to open at the same
+   * due time; an open one is completed. Which direction is decided from the
+   * row's own state rather than from the group it was rendered in, so the two
+   * can never disagree. */
+  async toggle(row: ReminderRowVm): Promise<void> {
+    const action =
+      row.reminder.state === "completed"
+        ? this.store.reopen(row.reminder.id, row.expectedDueAt)
+        : this.store.complete(row.reminder.id, row.expectedDueAt);
+    await action.catch(() => {
       // The store surfaces the failure through its own error signal.
     });
   }

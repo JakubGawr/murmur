@@ -173,11 +173,19 @@
 .row-check:hover:not(:disabled) .check-mark {
   opacity: 0.45;
 }
-/* Completed: filled ring, solid check, and the cursor stops promising a toggle —
-   there is no command to reopen a reminder, so this is a state, not a control. */
+.row-check[aria-checked="true"]:hover:not(:disabled) .check-mark {
+  opacity: 1;
+}
+/* Completed: filled ring, solid check — and still a live control, because the
+   circle un-ticks as well as ticks. */
 .row-check[aria-checked="true"] {
   color: var(--accent);
-  cursor: default;
+}
+/* Hovering a finished one dims the fill, the way hovering an open one shows a
+   faint check: in both directions the hint previews the OTHER state. */
+.row-check[aria-checked="true"]:hover:not(:disabled) {
+  color: var(--accent-hover);
+  opacity: 0.75;
 }
 .row-check[aria-checked="true"] .check-ring {
   fill: currentColor;
