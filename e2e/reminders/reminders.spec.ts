@@ -2433,9 +2433,21 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
     .click();
   const noteCard = page.locator("app-smart-reminder-card");
   await expect(noteCard).toBeVisible();
-  await noteCard.getByRole("button", { name: "New reminder" }).click();
+  // The card's own create button is gone: 701be0fc replaced the inline action with
+  // the note's Reminders drawer, and the card is mounted with
+  // `[showCreateAction]="false"`. Clicking a button that no longer renders is what
+  // hung this test for its full 90s budget. Same intent — routed authored-note
+  // context reaching the composer — driven through the affordance that replaced it.
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
+  const notePanel = page.locator("app-note-reminders-panel");
+  await expect(notePanel).toBeVisible();
+  await notePanel.getByRole("button", { name: "New reminder" }).click();
   await expect(composer.getByText("Atlas — PRD v3")).toBeVisible();
   await composer.getByRole("button", { name: "Cancel" }).click();
+  // Leave the drawer as this block found it — the assertions after this one read
+  // the note surface, not the drawer.
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
+  await expect(notePanel).toHaveCount(0);
 
   // A committed authored-note edit updates sourceRevision and re-audits once
   // after the debounce, instead of once per keystroke/autosave frame.
