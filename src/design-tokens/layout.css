@@ -1,6 +1,19 @@
 /* Design tokens — generated split of the former styles.css :root (prototype).
    Every value the UI uses lives HERE; components consume var(--token) only. */
 :root {  /* --- Radius (large, soft, Apple-round) ---------------------------------- */
+  /* CONTROLS that are pill-shaped by TASTE, not by function — the tab strip's
+     tabs, the segmented control, the sidebar footer's action row, quick
+     search's mode buttons. A skin legitimately disagrees about these: a full
+     pill reads as an app control, and a document-shaped skin wants the same
+     square-ish corner as everything else it draws.
+
+     Deliberately NOT `--radius-pill` itself. That token has ~190 call sites and
+     most of them are round because a circle or a capsule is what the thing IS —
+     the toggle switch, the scrollbar thumb, the slider and meter tracks,
+     spinners, count badges, avatars. Overriding it would square those off too,
+     which is not a restyle, it is a bug. The split is the whole point: this
+     token means "pill by choice", `--radius-pill` means "pill by nature". */
+  --radius-control: var(--radius-pill);
   --radius-sm: 9px;
   --radius-md: 13px;
   --radius-lg: 18px;
@@ -131,13 +144,7 @@
      sits beside it. Capture takes the remaining width; the round one stays
      square, so a single size keeps them on one line. */
   --shell-footer-btn: 36px;
-  /* Their SHAPE, separate from their size, because it is the one thing a skin
-     legitimately disagrees about: a full pill reads as an app control, and a
-     document-shaped skin wants the same square-ish corner as everything else.
-     Deliberately NOT `--radius-pill` itself — that token also shapes the
-     toggle switch, the scrollbar thumb, the slider track and every status
-     pill, none of which should stop being round. */
-  --shell-footer-btn-radius: var(--radius-pill);
+
   /* Collapsed width: the panel wraps the macOS window buttons with the SAME
      margin on each side.
 

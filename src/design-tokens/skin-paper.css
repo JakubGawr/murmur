@@ -143,10 +143,14 @@
      ground that film is white-on-white, which is exactly how the sidebar's two
      round footer buttons came out nearly invisible. */
   --btn-bg: var(--surface-input);
-  /* Capture and its two round neighbours stop being pills. Notion's and
-     Obsidian's sidebars square these off; a lone fully-round accent pill was
-     the loudest remaining "app control" in an otherwise document-shaped rail. */
-  --shell-footer-btn-radius: var(--radius-sm);
+  /* Every control that is a pill by TASTE squares off: the open tabs, the
+     segmented control, the sidebar footer's action row, quick search's mode
+     buttons. Notion and Obsidian shape all four as rounded rectangles, and a
+     capsule among them is the loudest remaining "app control" in an otherwise
+     document-shaped window. Things that are round by NATURE — the toggle
+     switch, scrollbar thumbs, slider and meter tracks, spinners, count badges —
+     keep `--radius-pill` and stay round. */
+  --radius-control: var(--radius-sm);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
