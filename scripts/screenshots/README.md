@@ -72,8 +72,13 @@ given run happens to be clean.
 - **`optimize.sh`** — resample to 1600 px wide + `pngquant`. Globs the directory, so
   a newly added shot cannot ship uncompressed the way it could when this was a
   copy-paste loop in this file with a hardcoded list of names.
-- **`run.sh`** — resolves Playwright from the npx cache (it is intentionally *not* a
-  `package.json` dependency — a dev-only capture tool) and runs the driver.
+- **`run.sh`** — resolves Playwright and runs the driver. It prefers the repo's own
+  `node_modules/playwright` (`@playwright/test` is a devDependency, so that is the
+  version whose browser builds `npx playwright install` provisions) and falls back to
+  the npx cache only for a checkout with no `node_modules`. It used to scan the npx
+  cache *first*, which is how a leftover `1.61.0-alpha-…` got selected over the
+  installed 1.61.1 and demanded a Chromium build nothing had — reported as a
+  "run npx playwright install" banner for a browser that was already installed.
 
 ## Mocking rules, learned the hard way
 
