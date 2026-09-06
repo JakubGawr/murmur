@@ -241,7 +241,7 @@ legend { padding: 0 var(--space-2); color: var(--text-secondary); font-size: 0.8
   white-space: nowrap;
 }
 .pill .pill-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
-.pill.is-accent { background: var(--accent-soft); border-color: transparent; color: var(--accent-hover); }
+.pill.is-accent { background: var(--accent-soft); border-color: transparent; color: var(--accent-text); }
 .pill.is-success { background: var(--success-soft); border-color: transparent; color: var(--success); }
 .pill.is-danger { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
 .pill.is-warning { background: var(--warning-soft); border-color: transparent; color: var(--warning); }
@@ -376,7 +376,7 @@ legend { padding: 0 var(--space-2); color: var(--text-secondary); font-size: 0.8
   transition: background var(--transition), color var(--transition);
 }
 .seg-btn:hover:not(.is-active):not(:disabled) { background: var(--surface-hover); color: var(--text-primary); }
-.seg-btn.is-active { background: var(--accent-soft); color: var(--accent-hover); }
+.seg-btn.is-active { background: var(--accent-soft); color: var(--accent-text); }
 .seg-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-ring); }
 .seg-btn:disabled { cursor: not-allowed; opacity: 0.5; }
 

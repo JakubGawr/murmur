@@ -33,6 +33,15 @@
      gradient-typed token so every `background: var(--accent-gradient)` call
      site keeps working unchanged. */
   --accent-gradient: linear-gradient(0deg, var(--accent), var(--accent));
+  /* The accent as TEXT (links, `.pill.is-accent`, an active segment label) as
+     opposed to `--accent-hover`'s other job, the filled-button hover GROUND.
+     One token was carrying both roles, and they pull in opposite directions:
+     text on a dark ground wants to get LIGHTER, a button ground under white
+     text wants to get DARKER. Defaulting to `--accent-hover` keeps the base
+     skin pixel-identical to what shipped; a skin can split them (Paper does,
+     which is how it clears 4.5:1 on links in BOTH themes where the base ramp
+     measures 2.53:1 in light). */
+  --accent-text: var(--accent-hover);
 
   /* --- Warm "live" accent (recording only — alive, not alarming) ---------- */
   --live: #ff7a5c;

@@ -3,6 +3,7 @@
 @import "./design-tokens/layout.css";
 @import "./design-tokens/glass.css";
 @import "./design-tokens/theme-light.css";
+@import "./design-tokens/skin-paper.css";
 @import "./design-tokens/accents.css";
 @import "./app/design-system/primitives.css";
 
@@ -48,8 +49,8 @@ body {
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 15px;
-  line-height: 1.55;
-  letter-spacing: -0.012em;
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
 }
 
 /* --- Atmospheric aurora field (sits behind everything; glass blurs it) -----
@@ -80,7 +81,7 @@ h1, h2, h3, h4 {
   margin: 0 0 var(--space-3);
   color: var(--text-primary);
   font-weight: 600;
-  letter-spacing: -0.025em;
+  letter-spacing: var(--tracking-heading);
   line-height: 1.15;
 }
 h1 { font-size: 1.85rem; font-weight: 650; }
@@ -90,7 +91,7 @@ h4 { font-size: 0.9375rem; }
 p { margin: 0 0 var(--space-3); }
 
 a {
-  color: var(--accent-hover);
+  color: var(--accent-text);
   text-decoration: none;
   transition: color var(--transition);
 }
@@ -206,7 +207,7 @@ app-shell {
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: var(--accent-soft);
-  color: var(--accent-hover);
+  color: var(--accent-text);
   font-family: inherit;
   font-size: 0.8rem;
   font-weight: 600;
@@ -235,7 +236,7 @@ app-shell {
 }
 .unlocked-glyph { display: block; flex: none; }
 .unlocked-count { font-variant-numeric: tabular-nums; }
-.unlocked-label { color: var(--accent-hover); opacity: 0.85; }
+.unlocked-label { color: var(--accent-text); opacity: 0.85; }
 /* The action half — pushed to the trailing edge, a touch bolder. */
 .unlocked-action { margin-left: auto; font-weight: 700; letter-spacing: 0; }
 

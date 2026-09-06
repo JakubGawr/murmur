@@ -1,0 +1,329 @@
+/* Design tokens — user-selectable THEME SKINS (Settings → Appearance → Theme).
+
+   A SKIN is a second, orthogonal axis to light/dark: `data-theme` decides how
+   BRIGHT the app is, `data-skin` decides what it is MADE OF. The default skin
+   ("Studio") is the base :root ramp in colors/layout/glass.css and stamps NO
+   attribute — exactly the `data-accent` convention in accents.css. Picking
+   "Paper" stamps `data-skin="paper"` on <html> (ChromeService) and the blocks
+   below re-declare the surface/type/shape tokens for BOTH activation paths of
+   every theme: explicit [data-theme="light"] AND System-mode
+   `prefers-color-scheme`, mirroring theme-light.css.
+
+   Imported AFTER theme-light.css (so a skin wins the surface tie against the
+   light block) and BEFORE accents.css (so a user's chosen accent still wins
+   over the skin's DEFAULT accent — which is additionally scoped
+   `:not([data-accent])`, making that independent of import order).
+
+   WHAT "PAPER" IS. A quiet document skin for people who spend the day reading
+   and writing notes, modelled on Apple Notes / Obsidian / Notion rather than on
+   the frosted control-room. Concretely: no glass, no aurora, no blur; opaque
+   warm surfaces; hairline borders instead of shadows; tighter radii; the native
+   macOS system face for UI and the system serif for the document body; a
+   restrained ink-blue accent instead of the indigo that reads as "AI app".
+
+   CONTRAST. Every text/background pair below was measured (WCAG 2.x relative
+   luminance) rather than eyeballed. Paper's own floors: body and secondary text
+   ≥ 4.5:1, the ≤12px tertiary tier ≥ 4.5:1, white-on-filled-accent ≥ 4.5:1,
+   link text ≥ 4.5:1. Measured ratios are noted inline. Two of these pairs are
+   places the base skin does NOT clear 4.5:1 today (white on #6e76ff = 3.69:1;
+   a light-theme link #8a90ff on #f3f3f8 = 2.53:1) — Paper fixes both for
+   itself; the base skin is deliberately left alone here. */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Skin PREVIEW swatches — skin-INDEPENDENT on purpose.
+
+   The Theme picker draws a tiny mock of each skin, so it must be able to paint
+   Paper's colours while Studio is active and vice versa. These six tokens are
+   the only duplication of a skin's identity outside its own block; they are
+   deliberately a 3-value summary (ground / ink / accent), not a copy of the
+   ramp, so there is nothing meaningful to drift. Declared for both themes.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --preview-studio-bg: #07070b;
+  --preview-studio-ink: #f6f6fa;
+  --preview-studio-accent: #6e76ff;
+  --preview-paper-bg: #1b1a18;
+  --preview-paper-ink: #ece9e4;
+  --preview-paper-accent: #9dbfe6;
+  /* The faces, so the picker's "Aa" sample can show the OTHER skin's type
+     while this one is active. Theme-independent, hence declared only here. */
+  --preview-studio-font: "Hanken Grotesk", -apple-system, system-ui, sans-serif;
+  --preview-paper-font: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+  /* Each mock draws its OWN corner, not the active skin's — reading
+     `var(--radius-md)` there would have made the Studio tile show Paper's
+     7px while Paper was active, i.e. the preview lying about the thing it is
+     previewing. Mirrors --radius-md/-lg in layout.css and in Paper's block. */
+  --preview-studio-radius: 13px;
+  --preview-paper-radius: 6px;
+}
+:root[data-theme="light"] {
+  --preview-studio-bg: #f3f3f8;
+  --preview-studio-ink: #17171f;
+  --preview-studio-accent: #6e76ff;
+  --preview-paper-bg: #faf9f6;
+  --preview-paper-ink: #22201d;
+  --preview-paper-accent: #2c5f9e;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"],
+  :root:not([data-theme]) {
+    --preview-studio-bg: #f3f3f8;
+    --preview-studio-ink: #17171f;
+    --preview-studio-accent: #6e76ff;
+    --preview-paper-bg: #faf9f6;
+    --preview-paper-ink: #22201d;
+    --preview-paper-accent: #2c5f9e;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PAPER — shared across both themes (type, shape, motion, glass-off).
+
+   These carry no light/dark information, so they are declared once. The
+   surface/text/accent ramps, which DO, follow in the per-theme blocks.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root[data-skin="paper"] {
+  /* --- Type -------------------------------------------------------------
+     UI drops Hanken Grotesk for the NATIVE macOS face: the geometric
+     grotesque is the single strongest "another AI product" signal, and SF
+     is what Apple Notes itself sets. No webfont is fetched or bundled.
+
+     The document body gets the system SERIF (`ui-serif` resolves to New York
+     on macOS — shipped with the OS, drawn for reading at text sizes). This is
+     a deliberate STYLISTIC call, not a readability claim: the evidence for
+     serif-vs-sans legibility on screen is inconclusive, and the levers that
+     do move reading comfort are size, leading, measure and contrast — which
+     is why this skin also relaxes leading and tracking below. Flip the skin's
+     document face by changing this ONE token. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui,
+    "Helvetica Neue", sans-serif;
+  --font-reading: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+
+  /* Hanken Grotesk needs negative tracking to look settled; SF at text sizes
+     is already optically spaced and goes muddy when you tighten it, so Paper
+     returns tracking to the face's own metrics. Leading opens to 1.65 — above
+     the 1.5 floor WCAG 1.4.8 asks of blocks of text, and the one change here
+     that measurably helps long transcripts. */
+  --tracking-body: 0;
+  --tracking-heading: -0.008em;
+  --leading-body: 1.65;
+
+  /* --- Shape: a document, not a floating pane -------------------------- */
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  /* --- Motion: quick and flat. `--ease-spring` loses its overshoot — a
+     bouncing panel is the opposite of a calm notepad — but stays a real easing
+     token so every `animation` shorthand composed with it remains valid. --- */
+  --transition: 140ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  --transition-fast: 90ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  --transition-dur: 140ms;
+  --transition-fast-dur: 90ms;
+  --ease-spring: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* --- Glass OFF ---------------------------------------------------------
+     Blur is token-driven almost everywhere in this app (`--glass-blur` and
+     `--shell-glass-blur` cover every frosted surface), so switching the whole
+     material off is a token change, not a sweep through 61 stylesheets. The
+     veil goes fully transparent because the fill underneath is already
+     opaque — `--glass-user-alpha` therefore has nothing left to fade, which
+     is why the Settings transparency slider hides itself under this skin. */
+  --glass-blur: 0px;
+  --glass-saturate: 100%;
+  --shell-glass-blur: 0px;
+  --shell-glass-saturate: 100%;
+  --shell-glass-veil: transparent;
+  --aurora-opacity: 0;
+  --aurora-field: none;
+  --shadow-accent: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PAPER — DARK ink. Not black: a warm charcoal, the way Obsidian and Notion
+   dark are. Text is an off-white rather than #fff — pure white on near-black
+   is the halation case, and 14.36:1 is already far past the AA floor.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root[data-skin="paper"] {
+  color-scheme: dark;
+  --surface-base: #1b1a18;
+  --surface-raised: #232220;
+  --surface-overlay: #2a2926;
+  --surface-input: #201f1d;
+  --surface-solid: #1f1e1c;
+  --surface-hover: rgba(255, 255, 255, 0.055);
+
+  --text-primary: #ece9e4;   /* 14.36:1 on --surface-base */
+  --text-secondary: #a8a49c; /*  7.00:1 on --surface-base */
+  --text-muted: #7d7973;     /*  4.02:1 — ≥13px only, per colors.css */
+  --text-tertiary: #97938c;  /*  5.20:1 on --surface-raised (≤12px tier) */
+  --text-on-accent: #ffffff;
+  --hatch-stripe: rgba(255, 255, 255, 0.05);
+
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+
+  /* Hairlines carry the depth; shadows are reserved for what genuinely floats. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.34);
+  --shadow-lg: 0 14px 38px rgba(0, 0, 0, 0.44);
+
+  /* Status hues, pulled off neon into ink. */
+  --success: #6bbf8a;
+  --success-soft: rgba(107, 191, 138, 0.15);
+  --danger: #e07a6f;
+  --danger-soft: rgba(224, 122, 111, 0.15);
+  --warning: #d9a55c;
+  --warning-soft: rgba(217, 165, 92, 0.15);
+
+  /* Recording stays warm and unmistakable, one step off the neon coral. */
+  --live: #e2764f;
+  --live-hover: #ee8963;
+  --live-soft: rgba(226, 118, 79, 0.16);
+  --live-glow: none;
+
+  /* Chrome: flat panel, neutral active pill, no lensing rim. */
+  --shell-glass-bg: linear-gradient(0deg, #1f1e1c, #1f1e1c);
+  --shell-glass-border: rgba(255, 255, 255, 0.09);
+  --shell-glass-inner: none;
+  --shell-active-bg: rgba(255, 255, 255, 0.075);
+  --shell-active-text: #ece9e4;
+  --shell-active-shadow: none;
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-highlight: none;
+}
+
+/* Paper's DEFAULT accent — ink blue, not indigo. Scoped `:not([data-accent])`
+   so an accent the user actually picked in Settings wins outright, whatever
+   the import order ends up being. `--accent` is the FILLED-button ground
+   (white on it = 5.06:1); `--accent-text` is the same identity re-tuned for
+   TEXT on this dark ground (9.13:1) — see the token's note in colors.css. */
+:root[data-skin="paper"]:not([data-accent]) {
+  --accent: #3f6fb5;
+  --accent-hover: #4a7ec9;
+  --accent-active: #35609e;
+  --accent-text: #9dbfe6;
+  --accent-soft: rgba(63, 111, 181, 0.22);
+  --accent-ring: rgba(110, 150, 210, 0.55);
+  --shell-active-icon: #9dbfe6;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PAPER — LIGHT. Warm paper (#faf9f6) rather than the base skin's cool
+   #f3f3f8; cards are true white so the document reads as a sheet ON a desk.
+   Declared TWICE, once per activation path, exactly like theme-light.css.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root[data-skin="paper"][data-theme="light"] {
+  color-scheme: light;
+  --surface-base: #faf9f6;
+  --surface-raised: #ffffff;
+  --surface-overlay: #ffffff;
+  --surface-input: #f1efe9;
+  --surface-solid: #ffffff;
+  --surface-hover: rgba(40, 34, 24, 0.045);
+
+  --text-primary: #22201d;   /* 15.43:1 on --surface-base */
+  --text-secondary: #5a554d; /*  7.02:1 on --surface-base */
+  --text-muted: #8a857c;     /*  3.48:1 — ≥13px only */
+  --text-tertiary: #6b665e;  /*  5.70:1 on --surface-raised (≤12px tier) */
+  --hatch-stripe: rgba(40, 34, 24, 0.055);
+
+  --border: rgba(40, 34, 24, 0.13);
+  --border-strong: rgba(40, 34, 24, 0.22);
+  --border-subtle: rgba(40, 34, 24, 0.07);
+
+  --shadow-sm: 0 1px 2px rgba(40, 34, 24, 0.08);
+  --shadow-md: 0 6px 16px rgba(40, 34, 24, 0.09);
+  --shadow-lg: 0 14px 34px rgba(40, 34, 24, 0.12);
+
+  --success: #2e8b57;
+  --success-soft: rgba(46, 139, 87, 0.12);
+  --danger: #c04a3d;
+  --danger-soft: rgba(192, 74, 61, 0.10);
+  --warning: #9a6b1f;
+  --warning-soft: rgba(154, 107, 31, 0.12);
+
+  --live: #c2542b;
+  --live-hover: #a9461f;
+  --live-soft: rgba(194, 84, 43, 0.13);
+  --live-glow: none;
+
+  --shell-glass-bg: linear-gradient(0deg, #ffffff, #ffffff);
+  --shell-glass-border: rgba(40, 34, 24, 0.11);
+  --shell-glass-inner: none;
+  --shell-active-bg: rgba(40, 34, 24, 0.06);
+  --shell-active-text: #22201d;
+  --shell-active-shadow: none;
+  --glass-border: rgba(40, 34, 24, 0.11);
+  --glass-highlight: none;
+}
+:root[data-skin="paper"][data-theme="light"]:not([data-accent]) {
+  --accent: #2c5f9e;       /* white on it = 6.49:1 */
+  --accent-hover: #26538b;
+  --accent-active: #1f4674;
+  --accent-text: #234e83;  /* link text = 8.01:1 on --surface-base */
+  --accent-soft: rgba(44, 95, 158, 0.12);
+  --accent-ring: rgba(44, 95, 158, 0.45);
+  --shell-active-icon: #2c5f9e;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-skin="paper"][data-theme="system"],
+  :root[data-skin="paper"]:not([data-theme]) {
+    color-scheme: light;
+    --surface-base: #faf9f6;
+    --surface-raised: #ffffff;
+    --surface-overlay: #ffffff;
+    --surface-input: #f1efe9;
+    --surface-solid: #ffffff;
+    --surface-hover: rgba(40, 34, 24, 0.045);
+
+    --text-primary: #22201d;
+    --text-secondary: #5a554d;
+    --text-muted: #8a857c;
+    --text-tertiary: #6b665e;
+    --hatch-stripe: rgba(40, 34, 24, 0.055);
+
+    --border: rgba(40, 34, 24, 0.13);
+    --border-strong: rgba(40, 34, 24, 0.22);
+    --border-subtle: rgba(40, 34, 24, 0.07);
+
+    --shadow-sm: 0 1px 2px rgba(40, 34, 24, 0.08);
+    --shadow-md: 0 6px 16px rgba(40, 34, 24, 0.09);
+    --shadow-lg: 0 14px 34px rgba(40, 34, 24, 0.12);
+
+    --success: #2e8b57;
+    --success-soft: rgba(46, 139, 87, 0.12);
+    --danger: #c04a3d;
+    --danger-soft: rgba(192, 74, 61, 0.10);
+    --warning: #9a6b1f;
+    --warning-soft: rgba(154, 107, 31, 0.12);
+
+    --live: #c2542b;
+    --live-hover: #a9461f;
+    --live-soft: rgba(194, 84, 43, 0.13);
+    --live-glow: none;
+
+    --shell-glass-bg: linear-gradient(0deg, #ffffff, #ffffff);
+    --shell-glass-border: rgba(40, 34, 24, 0.11);
+    --shell-glass-inner: none;
+    --shell-active-bg: rgba(40, 34, 24, 0.06);
+    --shell-active-text: #22201d;
+    --shell-active-shadow: none;
+    --glass-border: rgba(40, 34, 24, 0.11);
+    --glass-highlight: none;
+  }
+  :root[data-skin="paper"][data-theme="system"]:not([data-accent]),
+  :root[data-skin="paper"]:not([data-theme]):not([data-accent]) {
+    --accent: #2c5f9e;
+    --accent-hover: #26538b;
+    --accent-active: #1f4674;
+    --accent-text: #234e83;
+    --accent-soft: rgba(44, 95, 158, 0.12);
+    --accent-ring: rgba(44, 95, 158, 0.45);
+    --shell-active-icon: #2c5f9e;
+  }
+}

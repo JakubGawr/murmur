@@ -45,7 +45,7 @@ interface SettingsSection {
  * label) by the search box so typing a setting's name surfaces its section.
  */
 const SETTINGS_SECTIONS: readonly SettingsSection[] = [
-  { id: "appearance", label: "Appearance", keywords: "theme light dark system look colour color mode" },
+  { id: "appearance", label: "Appearance", keywords: "theme light dark system look colour color mode skin studio paper serif font minimal glass accent" },
   { id: "general", label: "General", keywords: "vault folder subfolder whisper model path setup onboarding" },
   { id: "transcription", label: "Transcription", keywords: "language quality whisper model download on-device size accuracy" },
   { id: "audio", label: "Audio & Capture", keywords: "microphone input device system audio vad smart speech detection high fidelity masters diarization remote speakers echo cancellation aec voice trigger hands-free" },

@@ -4,6 +4,22 @@
   --font-sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, system-ui,
     sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  /* The DOCUMENT face — the long-form note/transcript body, as distinct from
+     UI chrome. Defaults to the UI face, so the base skin renders exactly as it
+     always has; a skin (see skin-paper.css) can give reading its own face
+     without touching a single component. Consumer: `.note-doc`. */
+  --font-reading: var(--font-sans);
+
+  /* --- Body metrics, as tokens so a skin can retune reading comfort --------
+     Hanken Grotesk is a geometric grotesque and wants the negative tracking
+     below to look settled; a system face does not, which is the whole reason
+     these are tokens rather than literals in the `body` / `h1..h4` rules.
+     `--leading-body` stays at or above the 1.5 that WCAG 1.4.8 asks of blocks
+     of text. Values here are the SHIPPED ones — changing them changes the
+     default skin. */
+  --tracking-body: -0.012em;
+  --tracking-heading: -0.025em;
+  --leading-body: 1.55;
 
   /* Compact command/picker hierarchy shared by dense workspace chrome. */
   --type-command-label: 0.84rem;

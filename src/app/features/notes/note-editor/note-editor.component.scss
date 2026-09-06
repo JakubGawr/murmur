@@ -447,6 +447,11 @@
 .note-doc {
   max-width: var(--editor-max);
   margin: 0 auto;
+  /* The DOCUMENT face. Defaults to --font-sans (see typography.css), so this is
+     a no-op for the base skin; Paper points it at the system serif. Scoped to
+     the document body on purpose — the editor's own chrome (toolbars, the
+     properties rail, code blocks) keeps the UI face. */
+  font-family: var(--font-reading);
   transition: max-width var(--transition);
 }
 .note-doc.is-full-width {
