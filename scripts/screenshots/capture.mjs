@@ -486,6 +486,11 @@ const SHOTS = {
     viewport: APP,
     async run(page) {
       await goto(page, "/notes/n-atlas-prd");
+      // A note WITH A BODY now opens in Preview, not Edit (a8eca7bd,
+      // "open a note that has a body in Preview") — so there is no textarea at
+      // all until the segmented control is switched back. This shot waited 15s
+      // for `textarea.body-area` and was skipped on every run after that landed.
+      await page.locator('.head-seg button[aria-label="Edit"]').click({ timeout: 15_000 });
       await page.waitForSelector("textarea.body-area", { timeout: 15_000 });
       await settle(page, 900);
       // The editor body is a textarea; the selection bubble is raised by
@@ -496,8 +501,13 @@ const SHOTS = {
         const el = document.querySelector("textarea.body-area");
         if (!el) return;
         const body = el.value;
-        // A sentence in the middle of the note reads better than the H1.
-        const start = Math.max(0, body.indexOf("p95"));
+        // A sentence in the middle of the note reads better than the H1. The old
+        // anchor ("p95") is no longer in the demo note, and `indexOf` returning
+        // -1 silently became `start = 0` — i.e. it quietly selected the H1, the
+        // one thing the line above says not to. Fail loudly instead.
+        const ANCHOR = "This revision folds in";
+        const start = body.indexOf(ANCHOR);
+        if (start < 0) throw new Error(`selection anchor ${JSON.stringify(ANCHOR)} is not in the demo note`);
         const dot = body.indexOf(".", start);
         el.focus();
         el.setSelectionRange(start, dot > start ? dot + 1 : Math.min(body.length, start + 120));
