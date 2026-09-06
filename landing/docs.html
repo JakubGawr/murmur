@@ -14,6 +14,28 @@
     })();
   </script>
   <style>
+    /* ── The app's own type, self-hosted ──────────────────────────────────
+       Murmur ships "Hanken Grotesk" (src/styles.css @font-face, variable woff2,
+       35 kB) and sets every screen in it. This page was set in SF Pro, so the
+       product screenshots below — rendered in Hanken Grotesk — always read as a
+       different product from the page around them. Same files, copied into
+       landing/assets/fonts/ so the page has no runtime dependency on the app
+       tree and no third-party font request.
+       ───────────────────────────────────────────────────────────────────── */
+    @font-face {
+      font-family: "Hanken Grotesk";
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url("./assets/fonts/hanken-grotesk.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "JetBrains Mono";
+      font-style: normal;
+      font-weight: 100 800;
+      font-display: swap;
+      src: url("./assets/fonts/jetbrains-mono.woff2") format("woff2");
+    }
     /* ─────────────────────────────────────────────────────────────
        Same Quiet Glass tokens as index.html, kept in sync manually
        for this PoC (src/design-tokens/*.css mirrors these too).
@@ -55,8 +77,9 @@
       --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.35);
       --shadow-lg: 0 22px 56px rgba(0, 0, 0, 0.48);
 
-      --font: -apple-system, "SF Pro Display", "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
-      --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+      /* Mirrors --font-sans in src/design-tokens/typography.css. */
+      --font: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 
       --maxw: 1320px;
       color-scheme: dark;
@@ -448,7 +471,7 @@
         </div>
         <div class="docs-group">
           <div class="docs-group-title">Organizing your work</div>
-          <a class="docs-nav-link" data-doc="spaces"><span class="dot"></span>Spaces</a>
+          <a class="docs-nav-link" data-doc="spaces"><span class="dot"></span>Workspaces</a>
           <a class="docs-nav-link" data-doc="dashboards"><span class="dot"></span>Dashboards</a>
           <a class="docs-nav-link" data-doc="imports"><span class="dot"></span>Imports</a>
           <a class="docs-nav-link" data-doc="tasks"><span class="dot"></span>Tasks &amp; reminders</a>
@@ -475,6 +498,7 @@
           <div class="docs-group-title">Configuration</div>
           <a class="docs-nav-link" data-doc="settings"><span class="dot"></span>Settings &amp; configuration</a>
           <a class="docs-nav-link" data-doc="shortcuts"><span class="dot"></span>Keyboard shortcuts</a>
+          <a class="docs-nav-link" data-doc="diagnostics"><span class="dot"></span>Developer mode &amp; diagnostics</a>
         </div>
         <div class="docs-group">
           <div class="docs-group-title">Privacy &amp; security</div>
@@ -499,10 +523,6 @@
               <li><b>One source of truth.</b> An encrypted SQLite database is canonical. The app UI, a local read-only MCP server, and your exported Markdown files are three thin readers over the same store — never three diverging copies.</li>
               <li><b>Yours to keep.</b> Every note is also plain <code>.md</code> with YAML front-matter and <code>[[wikilinks]]</code>. No proprietary format, ever.</li>
             </ul>
-            <div class="callout tip">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/><path d="M9 21h6"/></svg>
-              <p>This is a proof-of-concept documentation template — a few sections, a handful of pages — so we can agree on the shape before writing the full set.</p>
-            </div>
           </div>
           <div class="doc-pager">
             <span></span>
@@ -523,32 +543,32 @@
               <li>Find it later in the app, in your Obsidian vault as a plain <code>.md</code> file, or ask about it through the local MCP server.</li>
             </ol>
             <div class="doc-card">
-              <h3>No setup required for the basics</h3>
-              <p>The bundled on-device model and local Whisper work out of the box — no account, no API key, no cloud provider to configure.</p>
+              <h3>No account, no API key</h3>
+              <p>Recording and transcription need nothing but a one-time Whisper model download, which Murmur handles for you. Notes are written by <b>Claude Code</b> out of the box &mdash; a local CLI that reaches the cloud, and only after you consent once. To keep everything on the Mac, download an on-device model in <b>Settings &rarr; AI &amp; Models</b>.</p>
             </div>
           </div>
           <div class="doc-pager">
             <a class="prev" data-doc-link="welcome"><span class="pager-label">Back</span><span class="pager-title">← Welcome to Murmur</span></a>
-            <a class="next" data-doc-link="spaces"><span class="pager-label">Next</span><span class="pager-title">Spaces →</span></a>
+            <a class="next" data-doc-link="spaces"><span class="pager-label">Next</span><span class="pager-title">Workspaces →</span></a>
           </div>
         </article>
 
-        <article class="doc-panel" id="doc-spaces" data-keywords="spaces hierarchy folders projects tree sidebar rail browse containers filing move organize lock sealed space recordings notes tasks boards">
+        <article class="doc-panel" id="doc-spaces" data-keywords="workspaces spaces hierarchy folders projects tree sidebar rail browse filing move organize lock sealed workspace space recordings notes tasks boards">
           <span class="eyebrow">Organizing your work</span>
-          <h1>Spaces</h1>
-          <p class="lede">One tree for everything you record and everything you write. Spaces replaced the two separate folder systems Murmur used to have.</p>
+          <h1>Workspaces</h1>
+          <p class="lede">One tree for everything you record and everything you write. Workspaces replaced the two separate folder systems Murmur used to have.</p>
           <div class="doc-body">
             <h2 id="one-tree">One tree, four kinds of thing</h2>
-            <p>A <b>Space</b> holds folders; a folder holds your recordings, notes, tasks and boards. There is no second hierarchy to keep in sync, and nothing belongs to "notes" instead of to a project. Move a recording into a folder and its note, its tasks and its board all sit beside it.</p>
+            <p>A <b>Workspace</b> holds folders; a folder holds your recordings, notes, tasks and boards. There is no second hierarchy to keep in sync, and nothing belongs to "notes" instead of to a project. Move a recording into a folder and its note, its tasks and its board all sit beside it.</p>
             <h2 id="rail-and-panel">The rail and the panel</h2>
-            <p>A slim icon rail is always on the left: <b>Capture</b>, <b>Search</b> (⌘K), <b>Spaces</b>, <b>Shared Brains</b>, <b>Ask</b>, <b>Browse</b>, and at the bottom <b>New note</b> (⌘N) and <b>Settings</b>. Beside it, one contextual panel switches between the Spaces tree and a flat <b>Browse</b> view that lists everything by kind — meetings, notes, tasks, boards, reminders — plus the Brain, Analytics, Graph and People.</p>
+            <p>A slim icon rail is always on the left: <b>Search</b> (⌘K), <b>Ask</b>, <b>Workspaces</b>, <b>Shared</b>, <b>Browse</b>, and at the bottom <b>Capture</b>, <b>Quick note</b> (⌘N) and <b>Settings</b>. Switch on Developer mode and a <b>Logs</b> group joins them. Beside the rail, one contextual panel switches between the Workspaces tree and a flat <b>Browse</b> view that lists everything by kind — meetings, notes, tasks, boards, reminders — plus the Brain, Analytics, Graph and People.</p>
             <h2 id="filing">Filing, by hand or by Brain</h2>
             <p>Drag an item where it belongs, or use <b>File recordings with Brain</b> and let it propose a home for the strays. You always see the proposed plan first, and nothing moves until you approve it.</p>
-            <h2 id="locking-a-space">Locking a Space</h2>
-            <p>Lock a Space and everything inside it is sealed with it — recordings, notes, transcripts, timelines and audio. A sealed Space still shows its <b>name</b>, because that is what you need in order to unlock it, and nothing else: no counts, no children, no items, not even totals.</p>
+            <h2 id="locking-a-workspace">Locking a Workspace</h2>
+            <p>Lock a Workspace and everything inside it is sealed with it — recordings, notes, transcripts, timelines and audio. A sealed Workspace still shows its <b>name</b>, because that is what you need in order to unlock it, and nothing else: no counts, no children, no items, not even totals.</p>
             <div class="callout security">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
-              <p>A Space lock cascades by locking each child folder in its own right, so every gate described on the <a href="javascript:void(0)" data-doc-link="lock-model" style="color:var(--accent-text); font-weight:600;">lock model</a> page applies to a Space unchanged — including the search index, the graph and the local server.</p>
+              <p>A Workspace lock cascades by locking each child folder in its own right, so every gate described on the <a href="javascript:void(0)" data-doc-link="lock-model" style="color:var(--accent-text); font-weight:600;">lock model</a> page applies to a Workspace unchanged — including the search index, the graph and the local server.</p>
             </div>
           </div>
           <div class="doc-pager">
@@ -562,17 +582,17 @@
           <h1>Dashboards</h1>
           <p class="lede">A board is a handful of things you care about, pulled onto one page — and then read through whichever lens you need.</p>
           <div class="doc-body">
-            <h2 id="tiles">Ten kinds of tile</h2>
-            <p>Put a <b>note</b>, a <b>recording</b>, a <b>document</b> or a <b>person</b> on a board directly. Or add a derived tile: a <b>reminders</b> list, a <b>drift</b> watch (how one fact changed over time), a <b>numbers</b> roll-up, an activity <b>pulse</b>, a <b>promise ledger</b>, or a <b>living answer</b>.</p>
+            <h2 id="tiles">Seven kinds of tile</h2>
+            <p>Put a <b>note</b>, a <b>recording</b>, a <b>document</b> or a <b>person</b> on a board directly. Or add a derived tile: a <b>reminders</b> list, a <b>promise ledger</b>, or a <b>living answer</b>.</p>
             <h2 id="living-answers">Living answers</h2>
-            <p>A living answer is a question the board keeps up to date — it shows the answer, and when it was last answered. If any source it drew on stops being readable (you locked the Space, or left the organization that shared it), the tile <b>withholds the answer</b> rather than serving a stale one from a source you can no longer see.</p>
+            <p>A living answer is a question the board keeps up to date — it shows the answer, and when it was last answered. If any source it drew on stops being readable (you locked the Workspace, or left the organization that shared it), the tile <b>withholds the answer</b> rather than serving a stale one from a source you can no longer see.</p>
             <h2 id="lenses">Five lenses, one set of tiles</h2>
             <p><b>Brief</b> is the summary read: the pinned answer, what needs attention, the recent evidence. <b>Overview</b> shows the tiles themselves. <b>Commitments</b> collects every promise and reminder the board can resolve. <b>Sources</b> lists the material it can actually read. <b>People</b> groups it by who is involved. No lens keeps a second copy of anything.</p>
             <h2 id="ask-a-board">Ask a board</h2>
             <p>You can ask a board a question directly, and the answer is grounded <i>only</i> in what is on it. Each board also states its own boundary — how many sources it can read, and how many views it derived from them — so you can tell the difference between "nothing to report" and "I can't see the material".</p>
           </div>
           <div class="doc-pager">
-            <a class="prev" data-doc-link="spaces"><span class="pager-label">Back</span><span class="pager-title">← Spaces</span></a>
+            <a class="prev" data-doc-link="spaces"><span class="pager-label">Back</span><span class="pager-title">← Workspaces</span></a>
             <a class="next" data-doc-link="imports"><span class="pager-label">Next</span><span class="pager-title">Imports →</span></a>
           </div>
         </article>
@@ -583,13 +603,13 @@
           <p class="lede">Bring the notes you already have. Three sources, no account, no key, and no network call.</p>
           <div class="doc-body">
             <h2 id="three-sources">Three sources</h2>
-            <p><b>Notion</b> — export your workspace as <i>Markdown &amp; CSV</i> with "Create folders for subpages" on, then point Murmur at the <code>.zip</code> or the unpacked folder. <b>Obsidian</b> — point it at the vault folder. <b>Apple Notes</b> — Murmur reads them through macOS, which will ask your permission the first time.</p>
+            <p><b>Notion</b> — export your <b>Notion</b> workspace as <i>Markdown &amp; CSV</i> with "Create folders for subpages" on, then point Murmur at the <code>.zip</code> or the unpacked folder. <b>Obsidian</b> — point it at the vault folder. <b>Apple Notes</b> — Murmur reads them through macOS, which will ask your permission the first time.</p>
             <h2 id="offline">Entirely offline</h2>
             <p>Every import runs on your Mac. Nothing is uploaded, and no provider is contacted — importing does not touch the cloud settings at all.</p>
             <h2 id="dry-run">Dry run first</h2>
-            <p>Every import is a dry run before it is a write. Murmur reports exactly what it <i>would</i> create, and what it recognises as already imported, so re-running an import doesn't duplicate anything. An import that has nowhere obvious to go lands in its own named, badged container rather than being scattered.</p>
+            <p>Every import is a dry run before it is a write. Murmur reports exactly what it <i>would</i> create, and what it recognises as already imported, so re-running an import doesn't duplicate anything. An import that has nowhere obvious to go lands in its own named, badged folder rather than being scattered.</p>
             <h2 id="after-import">After the import</h2>
-            <p>Imported notes are ordinary notes: filed in a Space, searchable, <code>[[linkable]]</code>, part of the same brain, and covered by the same lock. Find it all in <b>Settings → Imports</b>.</p>
+            <p>Imported notes are ordinary notes: filed in a folder, searchable, <code>[[linkable]]</code>, part of the same brain, and covered by the same lock. Find it all in <b>Settings → Imports</b>.</p>
           </div>
           <div class="doc-pager">
             <a class="prev" data-doc-link="dashboards"><span class="pager-label">Back</span><span class="pager-title">← Dashboards</span></a>
@@ -623,12 +643,16 @@
             <h2 id="dual-stream-capture">Dual-stream capture</h2>
             <p>Your microphone and the other side's system audio (via a ScreenCaptureKit sidecar) are recorded as two separate streams, then transcribed independently before being merged by wall-clock into a single <b>Me / Others</b> timeline. This avoids the echo and cross-talk problems of single-stream capture.</p>
             <h2 id="on-device-whisper">On-device Whisper</h2>
-            <p>Transcription runs fully on-device via <code>whisper.cpp</code> with Metal acceleration. Pick a model from <code>tiny</code> to <code>large-v3</code> depending on your speed/accuracy tradeoff, with optional speaker diarization and voice-activity detection.</p>
+            <p>Transcription runs fully on-device via <code>whisper.cpp</code> with Metal acceleration. Pick a model from <code>tiny</code> to <code>large-v3</code> &mdash; including the faster turbo build and quantized variants &mdash; or just pick a rung: <b>Light</b>, <b>Balanced</b>, <b>Sharp</b> or <b>Maximum</b>. Murmur picks a sensible default for your Mac. Speaker diarization and voice-activity detection are optional on top.</p>
             <ul>
               <li>Live captions while you talk, not just after the call ends</li>
               <li>A floating recorder bar you can trigger from any app</li>
               <li>Segments land straight in the encrypted SQLite store as the single source of truth</li>
             </ul>
+            <h2 id="live-caption-engine">The live-caption engine</h2>
+            <p>Live captions run on Whisper by default. If you want them lighter, Settings offers a second engine you download once (about 600 MB, CPU-only). Either way the <b>saved</b> transcript is always Whisper's &mdash; the caption engine only changes what you see while you are still talking.</p>
+            <h2 id="when-capture-goes-wrong">When capture goes wrong</h2>
+            <p>If the system-audio helper dies mid-recording, Murmur says so on screen instead of quietly continuing with your microphone alone &mdash; a half-recorded call you know about beats a clean-looking one that is missing the other side. And a recording whose transcription failed offers <b>Transcribe again</b> rather than stranding the audio.</p>
           </div>
           <div class="doc-pager">
             <a class="prev" data-doc-link="tasks"><span class="pager-label">Back</span><span class="pager-title">← Tasks &amp; reminders</span></a>
@@ -645,7 +669,7 @@
             <h2 id="pluggable-providers">Pluggable providers</h2>
             <p>The reasoning layer is one trait behind a swappable provider seam:</p>
             <ul>
-              <li><b>On-device</b> (Bielik-11B, Qwen via Metal) — fully local, the default</li>
+              <li><b>On-device</b> (Bielik-11B, Qwen via Metal) — fully local, once you download a model in Settings &rarr; AI &amp; Models</li>
               <li><b>Ollama</b> — fully local, your own models</li>
               <li><b>Claude Code / Anthropic / any OpenAI-compatible gateway</b> — cloud-bound text passes a redaction firewall first</li>
             </ul>
@@ -688,6 +712,8 @@
               <div class="tier-row">
                 <div class="tier-name">2 · Vault</div>
                 <div class="tier-tools">
+                  <span class="tool-pill">list_dashboards</span>
+                  <span class="tool-pill">get_dashboard</span>
                   <span class="tool-pill">search_meetings</span>
                   <span class="tool-pill">search_semantic</span>
                   <span class="tool-pill">get_meeting</span>
@@ -696,7 +722,6 @@
                   <span class="tool-pill">list_recent_meetings</span>
                   <span class="tool-pill">get_open_commitments</span>
                   <span class="tool-pill">get_entity_dossier</span>
-                  <span class="tool-pill">knowledge_diff</span>
                   <span class="tool-pill">query_database</span>
                 </div>
               </div>
@@ -708,7 +733,10 @@
                   <span class="tool-pill">calendar_lookup</span>
                   <span class="tool-pill">jira_search</span>
                   <span class="tool-pill">slack_search</span>
+                  <span class="tool-pill">notion_search</span>
+                  <span class="tool-pill">clickup_search</span>
                   <span class="tool-pill">org_brain_search</span>
+                  <span class="tool-plus">plus any MCP server you connect</span>
                 </div>
               </div>
               <div class="tier-row">
@@ -722,7 +750,7 @@
               <p>The tier boundary is an <b>allowlist in code</b>, not prompt instructions — a model that mis-judges scope still has no way to call a higher tier's tools this turn.</p>
             </div>
             <h2 id="connectors">Connectors — reaching outside the vault</h2>
-            <p>Web search, calendar, Jira, and Slack are live connectors the brain can call on demand, turned into cited answers exactly like a vault hit. Web search (Brave), Jira, and Slack are <b>off by default</b> and reachable only once you've both enabled and explicitly consented to each — the outgoing query is scrubbed by the same redaction firewall as any other cloud-bound text. Your <b>local macOS Calendar</b> is different: it's read entirely on-device via EventKit, so it needs the Calendar permission but no cloud consent — nothing about it ever leaves the Mac. Every connector hit, local or external, carries a visible source label (e.g. "web · Brave", "calendar") so you always know exactly where an answer came from.</p>
+            <p>Web search, calendar, Jira, Slack, Notion and ClickUp are live connectors the brain can call on demand, turned into cited answers exactly like a vault hit. Web search (Brave), Jira, Slack, Notion and ClickUp are <b>off by default</b> and reachable only once you've both enabled and explicitly consented to each — the outgoing query is scrubbed by the same redaction firewall as any other cloud-bound text. Your <b>local macOS Calendar</b> is different: it's read entirely on-device via EventKit, so it needs the Calendar permission but no cloud consent — nothing about it ever leaves the Mac. Any MCP server you connect is treated the same way &mdash; its tools are connector-class, reachable only at this tier. Every connector hit, local or external, carries a visible source label (e.g. "web · Brave", "calendar") so you always know exactly where an answer came from.</p>
           </div>
           <div class="doc-pager">
             <a class="prev" data-doc-link="brain"><span class="pager-label">Back</span><span class="pager-title">← The on-device brain</span></a>
@@ -824,8 +852,10 @@
           <h1>AI providers</h1>
           <p class="lede">The reasoning layer behind the in-meeting brain, Ask Your Vault, and note-writing is one trait behind a swappable provider seam — pick what runs where.</p>
           <div class="doc-body">
-            <h2 id="on-device-default">On-device (the default)</h2>
-            <p>Bielik-11B or Qwen, running locally via Metal. No account, no API key, no network call — this is what Murmur uses out of the box for the brain, Ask, and note-writing.</p>
+            <h2 id="on-device-default">On-device</h2>
+            <p>Bielik-11B or Qwen, running locally via Metal. No account, no API key, no network call. Nothing is bundled with the app — pick a model in <b>Settings &rarr; AI &amp; Models</b> and Murmur downloads it once (1.1&ndash;9 GB depending on the model); from then on the brain, Ask and note-writing can all run with the network off.</p>
+            <h2 id="what-ships-as-default">What Murmur uses out of the box</h2>
+            <p><b>Claude Code</b> is the default summarizer &mdash; a local CLI that reaches the cloud. Nothing is sent until you consent once, and what it sends is redacted first. If you would rather nothing left at all, download an on-device model or point Murmur at Ollama, and set that as your provider.</p>
             <h2 id="ollama-integration">Ollama</h2>
             <p>Point Murmur at your own local Ollama models. Still fully local — no meeting text ever leaves the Mac with this provider either.</p>
             <h2 id="cloud-providers-opt-in">Cloud providers (opt-in)</h2>
@@ -864,7 +894,7 @@
             <h2 id="your-obsidian-vault">Your Obsidian vault</h2>
             <p>Every note is exported as atomic Markdown straight into your vault — YAML front-matter, <code>[[wikilinks]]</code>, <code>obsidian://</code> block-refs, and an optional canvas board. They're plain files you own, editable in Obsidian or anything else that reads Markdown.</p>
             <h2 id="mcp-setup">A local, read-only MCP server</h2>
-            <p>Murmur exposes an MCP server on <code>127.0.0.1:8765</code> so Claude Desktop or Claude Code can query your notes directly. It's read-only, and it respects the lock model exactly like the app — a sealed, locked meeting is invisible to it too. Twenty tools cover your meetings and their transcripts, imported documents and their outlines, semantic search, open commitments, entity dossiers, the entity list, note folders, your <b>Spaces</b> hierarchy, your <b>boards</b>, your shared <b>tasks</b>, and your Shared Brain.</p>
+            <p>Murmur exposes an MCP server on <code>127.0.0.1:8765</code> so Claude Desktop or Claude Code can query your notes directly. It's read-only, and it respects the lock model exactly like the app — a sealed, locked meeting is invisible to it too. Twenty tools cover your meetings and their transcripts, imported documents and their outlines, semantic search, open commitments, entity dossiers, the entity list, note folders, your <b>Workspaces</b> hierarchy, your <b>boards</b>, your shared <b>tasks</b>, and your Shared Brain.</p>
             <div class="code-label">claude_desktop_config.json</div>
             <pre class="code-block"><span class="c">// Point Claude Desktop at your local Murmur MCP server</span>
 {
@@ -891,18 +921,20 @@
         <article class="doc-panel" id="doc-settings" data-keywords="settings configuration appearance theme accent sidebar liquid glass audio transcription diarization voice trigger wake phrase connectors privacy memory facts obsidian storage notes subfolders sharing organizations">
           <span class="eyebrow">Configuration</span>
           <h1>Settings &amp; configuration</h1>
-          <p class="lede">Every group below is a real Settings section in the app today, not a hypothetical — grouped the same way you'd find them there.</p>
+          <p class="lede">Settings opens as a modal over the app, not a pane beside it. Fifteen sections, in the six groups you'll find them under — every one of them real.</p>
           <div class="doc-body">
-            <h2 id="appearance">Appearance</h2>
-            <p>Theme (Light / Dark / System — the same switch this docs site uses), an accent color, sidebar options, and a Liquid Glass transparency slider for the app's frosted chrome.</p>
-            <h2 id="audio-and-transcription">Audio &amp; transcription</h2>
-            <p>Toggles for capturing system audio, smart speech detection, keeping high-fidelity audio masters, splitting "Others" into individual speakers, recognising speakers across meetings, and removing speaker echo from recordings — plus the transcription model picker, the live-caption engine, on-device brain lifecycle settings, and the <b>voice trigger</b> toggle behind the in-meeting wake phrase.</p>
-            <h2 id="ai-and-connectors">AI &amp; connectors</h2>
-            <p>Pick a provider and configure connectors from here — see <a href="javascript:void(0)" data-doc-link="providers" style="color:var(--accent-text); font-weight:600;">AI providers</a> for the provider list and <a href="javascript:void(0)" data-doc-link="brain-capabilities" style="color:var(--accent-text); font-weight:600;">What the Brain can do</a> for what each connector unlocks. A separate "Remember facts about you" toggle controls whether the brain builds a persistent memory of you across sessions.</p>
-            <h2 id="obsidian-storage-notes">Obsidian, storage &amp; notes</h2>
-            <p>Your Obsidian vault path, an auto-delete policy for old recordings (plus a manual "Free up space now"), and a toggle to organize notes into thematic subfolders automatically.</p>
-            <h2 id="sharing-and-organizations">Sharing &amp; organizations</h2>
-            <p>Your sharing account and incoming shares, and the organizations you belong to for <a href="javascript:void(0)" data-doc-link="shared-brain" style="color:var(--accent-text); font-weight:600;">Shared Brain</a>.</p>
+            <h2 id="appearance">Appearance &amp; General</h2>
+            <p><b>Appearance</b> — theme (Light / Dark / System — the same switch this docs site uses), an accent color, sidebar options, and a Liquid Glass transparency slider for the app's frosted chrome. <b>General</b> — your vault folder, note subfolders and the first-run setup.</p>
+            <h2 id="capture">Capture</h2>
+            <p><b>Transcription</b> — language, quality, and the on-device model picker. <b>Audio &amp; Capture</b> — input device, capturing system audio, smart speech detection, high-fidelity masters, splitting "Others" into individual speakers, recognising speakers across meetings, echo removal, and the <b>voice trigger</b> behind the in-meeting wake phrase. <b>Storage</b> — disk usage, an auto-delete policy for old recordings, and a manual "Free up space now".</p>
+            <h2 id="intelligence">Intelligence</h2>
+            <p><b>Notes</b> — summary style, action-item language, and automatic thematic subfolders. <b>AI &amp; Models</b> — pick a provider and download an on-device model; see <a href="javascript:void(0)" data-doc-link="providers" style="color:var(--accent-text); font-weight:600;">AI providers</a>. <b>Connectors</b> — web search, Jira, Slack, Notion and ClickUp; see <a href="javascript:void(0)" data-doc-link="brain-capabilities" style="color:var(--accent-text); font-weight:600;">What the Brain can do</a>.</p>
+            <h2 id="sharing-and-organizations">Sharing</h2>
+            <p><b>Account</b> — your sharing account, share links and incoming shares. <b>Organization</b> — the organizations you belong to for <a href="javascript:void(0)" data-doc-link="shared-brain" style="color:var(--accent-text); font-weight:600;">Shared Brain</a>.</p>
+            <h2 id="privacy-and-vault">Privacy &amp; Vault</h2>
+            <p><b>Privacy &amp; Integrations</b> — the redaction firewall, cloud-processing consent, locked folders, the local server for other apps, "Remember facts about you", and <b>Check for updates on launch</b>. <b>Obsidian</b> — your vault path and export options. <b>Imports</b> — Notion, Obsidian and Apple Notes.</p>
+            <h2 id="developer-and-about">Developer &amp; About</h2>
+            <p><b>Developer</b> — developer mode, the app log and the diagnostics bundle; see <a href="javascript:void(0)" data-doc-link="diagnostics" style="color:var(--accent-text); font-weight:600;">Developer mode &amp; diagnostics</a>. <b>About</b> — the version you are running, and the update check.</p>
           </div>
           <div class="doc-pager">
             <a class="prev" data-doc-link="integrations-apps"><span class="pager-label">Back</span><span class="pager-title">← Obsidian, MCP, Reminders &amp; file ingestion</span></a>
@@ -916,7 +948,16 @@
           <p class="lede">A short, real list — Murmur keeps global shortcuts to exactly one, on purpose.</p>
           <div class="doc-body">
             <h2 id="global">Global</h2>
-            <p><code>⌘⇧R</code> toggles the floating recorder bar from anywhere on the Mac — the only global shortcut the app registers.</p>
+            <p><code>⌘⇧R</code> toggles the floating recorder bar from anywhere on the Mac — the only shortcut Murmur registers system-wide, and the only one that works while another app is in front.</p>
+            <h2 id="in-the-app">In the app</h2>
+            <ul>
+              <li><code>⌘K</code> — search</li>
+              <li><code>⌘N</code> — new note</li>
+              <li><code>⌘T</code> — new tab</li>
+              <li><code>⌘W</code> — close the current tab</li>
+              <li><code>Esc</code> — dismiss whatever is open</li>
+              <li><code>⌘R</code> — on the record screen, starts and stops the recording</li>
+            </ul>
             <h2 id="in-the-note-editor">In the note editor</h2>
             <ul>
               <li><code>⌘B</code> / <code>⌘I</code> — bold / italic</li>
@@ -929,14 +970,34 @@
           </div>
           <div class="doc-pager">
             <a class="prev" data-doc-link="settings"><span class="pager-label">Back</span><span class="pager-title">← Settings &amp; configuration</span></a>
+            <a class="next" data-doc-link="diagnostics"><span class="pager-label">Next</span><span class="pager-title">Developer mode &amp; diagnostics →</span></a>
+          </div>
+        </article>
+
+        <article class="doc-panel" id="doc-diagnostics" data-keywords="developer mode logs log file diagnostics bundle debug crash troubleshooting support advanced retention">
+          <span class="eyebrow">Configuration</span>
+          <h1>Developer mode &amp; diagnostics</h1>
+          <p class="lede">Off by default. Switch it on when something has gone wrong and you want to see &mdash; or send &mdash; what the app actually did.</p>
+          <div class="doc-body">
+            <h2 id="developer-mode">Developer mode</h2>
+            <p>In <b>Settings &rarr; Developer</b>, turning on developer mode adds a <b>Logs</b> group to the rail. It changes nothing about how the app records, transcribes or reasons &mdash; it only makes the log readable from inside the app instead of hunting for a file.</p>
+            <h2 id="the-app-log">The app log</h2>
+            <p>A plain, readable list of what the app has been doing: stage names, counts, durations and errors. Click a row and it expands into the whole entry. The log holds IDs and stage names, never your note text, transcript segments, titles or keys &mdash; a debug log is not allowed to become the leak the rest of the app prevents.</p>
+            <h2 id="retention">Kept for a week, and capped</h2>
+            <p>Entries older than <b>seven days</b> are deleted, and the log is bounded in size as well (16 MB) so a long or noisy session cannot quietly fill the disk. Both limits apply on their own &mdash; whichever is reached first.</p>
+            <h2 id="diagnostics-bundle">The diagnostics bundle</h2>
+            <p>One button exports the log as a single file you can attach to a bug report. Read it before you send it: it is yours, it leaves the Mac only because you chose to send it, and nothing about it is automatic.</p>
+          </div>
+          <div class="doc-pager">
+            <a class="prev" data-doc-link="shortcuts"><span class="pager-label">Back</span><span class="pager-title">← Keyboard shortcuts</span></a>
             <a class="next" data-doc-link="data-flow"><span class="pager-label">Next</span><span class="pager-title">What never leaves your Mac →</span></a>
           </div>
         </article>
 
-        <article class="doc-panel" id="doc-data-flow" data-keywords="privacy data flow local-first what leaves stays on device signed notarized consent">
+        <article class="doc-panel" id="doc-data-flow" data-keywords="privacy data flow local-first what leaves stays on device signed notarized consent update check for updates launch version github network call opt out">
           <span class="eyebrow">Privacy &amp; security</span>
           <h1>What never leaves your Mac</h1>
-          <p class="lede">A plain-language breakdown of what stays local by default, and the one thing that can leave — only if you opt in.</p>
+          <p class="lede">A plain-language breakdown of what stays local, the one call Murmur makes by default, and the one thing that can carry your content out — only if you opt in.</p>
           <div class="doc-body">
             <h2 id="stays-on-your-mac">Stays on your Mac, always</h2>
             <ul>
@@ -946,15 +1007,17 @@
               <li>The auto-extracted entity graph (people, projects)</li>
               <li>Every encryption key — the SQLCipher DEK and every folder's content key</li>
             </ul>
+            <h2 id="leaves-by-default">Leaves by default — one call, none of your content</h2>
+            <p>At launch Murmur asks GitHub whether a newer version of the app exists. The request says which version of Murmur you are running, because that is how it asks the question — and nothing else: no meetings, no notes, no account. It is recorded in the same ledger as every other call that leaves the Mac, and you can switch it off in <b>Settings &rarr; Privacy &rarr; Check for updates on launch</b>.</p>
             <h2 id="only-with-opt-in">Only leaves if you opt in</h2>
-            <p>The single exception is meeting text sent to a cloud provider you've explicitly enabled — and even then, only <b>after</b> the redaction firewall scrubs emails, phone numbers, and card-like numbers. See <a href="javascript:void(0)" data-doc-link="redaction-firewall" style="color:var(--accent-text); font-weight:600;">Redaction firewall &amp; cloud egress</a> for the full provider-by-provider breakdown and <a href="javascript:void(0)" data-doc-link="providers" style="color:var(--accent-text); font-weight:600;">AI providers</a> for how to configure one.</p>
+            <p>The only thing that ever carries your <b>content</b> off the Mac is meeting text sent to a cloud provider you've explicitly enabled — and even then, only <b>after</b> the redaction firewall scrubs emails, card-like numbers and phone numbers &mdash; and people's names too, if you have turned on name masking. See <a href="javascript:void(0)" data-doc-link="redaction-firewall" style="color:var(--accent-text); font-weight:600;">Redaction firewall &amp; cloud egress</a> for the full provider-by-provider breakdown and <a href="javascript:void(0)" data-doc-link="providers" style="color:var(--accent-text); font-weight:600;">AI providers</a> for how to configure one.</p>
             <div class="callout security">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
               <p>The app itself is <b>signed &amp; notarized</b> for macOS — Gatekeeper verifies it before it ever runs, the same bar every trusted Mac app has to clear.</p>
             </div>
           </div>
           <div class="doc-pager">
-            <a class="prev" data-doc-link="shortcuts"><span class="pager-label">Back</span><span class="pager-title">← Keyboard shortcuts</span></a>
+            <a class="prev" data-doc-link="diagnostics"><span class="pager-label">Back</span><span class="pager-title">← Developer mode &amp; diagnostics</span></a>
             <a class="next" data-doc-link="lock-model"><span class="pager-label">Next</span><span class="pager-title">The lock model →</span></a>
           </div>
         </article>
@@ -996,7 +1059,7 @@
           <p class="lede">If you ever opt into a cloud provider, sensitive text is scrubbed first — and egress is fail-closed behind a one-time consent.</p>
           <div class="doc-body">
             <h2 id="whats-scrubbed">What's scrubbed before it leaves</h2>
-            <p>Emails, phone numbers, and card-like numbers are redacted from meeting text before it's ever sent to a cloud summarizer. Nothing crosses the network until you've explicitly consented to that specific provider — the default is fully on-device.</p>
+            <p>Emails, card-like numbers and phone numbers are redacted from meeting text before it's ever sent to a cloud summarizer. <b>Names are not, by default</b> &mdash; pattern matching cannot reliably find them. Download the optional <b>name-masking</b> model in <b>Settings &rarr; Privacy</b> and an on-device pass replaces people's names with a <code>(person)</code> placeholder before anything leaves. Nothing crosses the network until you've explicitly consented to that specific provider.</p>
             <h2 id="providers-and-egress">Providers &amp; what actually leaves your Mac</h2>
             <div class="doc-table">
               <div class="scroll">
@@ -1006,13 +1069,14 @@
                     <tr><td>On-device brain (Bielik / Qwen)</td><td>Fully local</td><td>No</td></tr>
                     <tr><td>Ollama</td><td>Fully local</td><td>No</td></tr>
                     <tr><td>Claude Code (default summarizer)</td><td>Local CLI → cloud</td><td>Redacted only</td></tr>
+                    <tr><td>Codex (OpenAI&rsquo;s CLI, run tool-free)</td><td>Local CLI &rarr; cloud</td><td>Redacted only</td></tr>
                     <tr><td>Anthropic API (bring your own key)</td><td>Direct HTTPS</td><td>Redacted only</td></tr>
                     <tr><td>AI Gateway (OpenAI-compatible endpoint)</td><td>Direct HTTPS</td><td>Redacted only</td></tr>
                   </tbody>
                 </table>
               </div>
             </div>
-            <p>Every egress decision is logged so you can see, in plain language, exactly what left the Mac and when — a running ledger, not a one-time toggle you forget about.</p>
+            <p>Every cloud AI call is logged and shown back to you in plain language — what left the Mac and when — a running ledger, not a one-time toggle you forget about.</p>
           </div>
           <div class="doc-pager">
             <a class="prev" data-doc-link="lock-model"><span class="pager-label">Back</span><span class="pager-title">← The lock model</span></a>

@@ -12,7 +12,7 @@ so the marketing shots are honest UI, privacy-safe by construction.
 # 1. serve the frontend (no Rust core needed — the mock replaces Tauri)
 npx ng serve --host 127.0.0.1 --port 4310 --watch=false
 
-# 2. capture every shot into docs/screenshots/ (dark theme, 2× retina)
+# 2. capture every shot into docs/screenshots/ (both themes, 2× retina)
 MURMUR_URL=http://127.0.0.1:4310 bash scripts/screenshots/run.sh
 
 # …or a subset:
@@ -29,9 +29,32 @@ screenshots that Rust build buys you nothing.
 > `src/` — including a string that appears in a shot — restart the server or the
 > capture will silently photograph the previous build.
 
-## The two guarantees
+## Light and dark
 
-A marketing image gets published and cannot be un-published, so two properties are
+Every shot is captured **twice**: `<name>.png` (dark) and `<name>-light.png`. The
+landing page swaps between them with its own theme switch, so a reader on a light
+page is not shown a dark app.
+
+Nothing about the app is poked to get the light one. `ThemeService` defaults to
+`system` and `design-tokens/theme-light.css` keys that mode on
+`prefers-color-scheme`, so the browser's colour scheme is the entire switch: the
+driver passes `colorScheme` to `browser.newContext` and the app follows.
+
+```bash
+MURMUR_SHOT_THEME=dark  bash scripts/screenshots/run.sh   # dark only
+MURMUR_SHOT_THEME=light bash scripts/screenshots/run.sh   # light only
+# default is `both` — a half-refreshed set is worse than a uniformly old one,
+# because nothing on the page tells a reader which half they are looking at.
+```
+
+Dark keeps the bare filename, so every existing reference to a shot still
+resolves. On the landing page the markup `src` is always the dark file and the
+swap is JS on top, so a reader with no JS — and a light shot not yet captured —
+both degrade to the dark image rather than a broken one.
+
+## The three guarantees
+
+A marketing image gets published and cannot be un-published, so three properties are
 enforced by the driver rather than left to whoever runs it.
 
 **1. The privacy gate.** Every shot's rendered text (plus the document title) is
@@ -51,7 +74,16 @@ It earned its keep on its first run by refusing all 27 shots over a stale window
 title. Add to `PRIVACY_DENY` in `capture.mjs` rather than reasoning about whether a
 given run happens to be clean.
 
-**2. The version comes from `package.json`.** The driver injects it as
+**2. The theme gate.** Before a shot is written, the driver reads the live
+`--surface-base` off `<html>` and refuses the shot unless it matches the theme that
+was requested (`#07070b` dark, `#f3f3f8` light). This is not paranoia: setting
+`colorScheme` on the context is *not* enough on its own, because this mock pins
+`murmur-theme` in localStorage. While it pinned `"dark"` unconditionally, the first
+light run wrote 30 files byte-identical to their dark counterparts and reported
+`60/60 shots captured`. A wrong screenshot under a right filename is worse than a
+missing one — nothing downstream can tell.
+
+**3. The version comes from `package.json`.** The driver injects it as
 `window.__demoVersion`; the mock never carries a literal. This mock served
 `"0.6.3"` into 2.0-era captures of the About screen.
 
@@ -71,9 +103,18 @@ given run happens to be clean.
   shot.
 - **`optimize.sh`** — resample to 1600 px wide + `pngquant`. Globs the directory, so
   a newly added shot cannot ship uncompressed the way it could when this was a
-  copy-paste loop in this file with a hardcoded list of names.
-- **`run.sh`** — resolves Playwright from the npx cache (it is intentionally *not* a
-  `package.json` dependency — a dev-only capture tool) and runs the driver.
+  copy-paste loop in this file with a hardcoded list of names. It re-reads each
+  width *after* resampling and exits non-zero if any file is still oversized:
+  `sips` can exit 0, print the path and change nothing when it cannot write its
+  temp file, and pngquant's savings then make the summary line look plausible
+  while the set stays several times too heavy.
+- **`run.sh`** — resolves Playwright and runs the driver. It prefers the repo's own
+  `node_modules/playwright` (`@playwright/test` is a devDependency, so that is the
+  version whose browser builds `npx playwright install` provisions) and falls back to
+  the npx cache only for a checkout with no `node_modules`. It used to scan the npx
+  cache *first*, which is how a leftover `1.61.0-alpha-…` got selected over the
+  installed 1.61.1 and demanded a Chromium build nothing had — reported as a
+  "run npx playwright install" banner for a browser that was already installed.
 
 ## Mocking rules, learned the hard way
 
