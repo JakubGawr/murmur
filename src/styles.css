@@ -352,7 +352,16 @@ app-shell {
    linked stylesheet. The rail chooses a surface; the adjacent panel contains
    only that surface's navigation. */
 app-shell {
-  gap: var(--shell-gutter);
+  /* NOT `gap`. The shell's flex row ends with several ZERO-WIDTH overlay
+     components — the account-session banner, the filing-recovery banner, the
+     document preview, the reminder composer — and a flex gap is paid between
+     every pair of items, empty or not. Each of them was quietly eating one
+     gutter, so the content column stopped 16px from the window's right edge
+     while the sidebar sat 8px from its left. Invisible while nothing lined up
+     against it; obvious the moment the note's tool pane became a panel like the
+     sidebar and the two gutters had to match. The gutter is a margin on the one
+     item that actually needs it. */
+  gap: 0;
   height: 100vh;
   padding: var(--shell-gutter);
   overflow: hidden;
@@ -1035,6 +1044,9 @@ app-shell.sidebar-collapsed {
 }
 
 app-shell > .main-col {
+  /* The gutter between the sidebar and the content column — see the note on
+     `app-shell`'s `gap: 0`. */
+  margin-left: var(--shell-gutter);
   height: calc(100vh - 2 * var(--shell-gutter));
   margin: 0;
   overflow: auto;

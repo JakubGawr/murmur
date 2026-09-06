@@ -412,14 +412,35 @@
   margin-top: calc(-1 * (var(--tabs-strip-height, 0px) + var(--space-2)));
   flex-direction: column;
   min-height: 0;
-  /* ONE continuous hairline divider, full height (it crosses the header band too, so the two panes
-     read as a single split, not a floating box). Same token as the header dividers ⇒ the vertical
-     and horizontal seams match. */
-  border-left: 1px solid var(--border);
-  /* A subtle raised pane tone so the "tool" column reads as distinct from the document without the
-     heavy opaque-modal look — it's in-flow chrome now (not a floating overlay), so T3 doesn't apply
-     and the frosted-raised surface is the right register. */
-  background: var(--surface-raised);
+  /* THE SHELL'S OWN PANEL FRAME (2026-09-06, user request: "the right pane still
+     doesn't have the rounding and style the left one has"). This used to be a
+     hairline-plus-raised-tone split of the content pane — a deliberate choice
+     while the shell was the only thing that floated, and the wrong one once the
+     sidebar sat beside it in Studio looking like a different species of object.
+
+     Reading the same `--shell-panel-*` tokens the sidebar reads settles BOTH of
+     the requests that pulled in opposite directions: Studio floats this pane
+     with the sidebar's radius, glass and shadow, while Paper — which zeroes
+     those tokens — keeps it flat and glued to the window, separated by the one
+     hairline that skin allows itself. One frame, two answers, no branch. */
+  background:
+    linear-gradient(var(--shell-glass-veil), var(--shell-glass-veil)),
+    var(--shell-glass-bg);
+  -webkit-backdrop-filter: blur(var(--shell-glass-blur)) saturate(var(--shell-glass-saturate));
+  backdrop-filter: blur(var(--shell-glass-blur)) saturate(var(--shell-glass-saturate));
+  border: var(--shell-panel-border);
+  border-left: var(--shell-panel-border-left);
+  border-radius: var(--shell-panel-radius);
+  /* No per-corner softening here, deliberately. `.app-sidebar` carries a rule
+     that means to soften its window-facing corners toward the OS mask, but that
+     rule is DEAD: `.app-sidebar.primary-sidebar` sets the `border-radius`
+     SHORTHAND later and at higher specificity, so the sidebar actually renders
+     24px on all four. Mirroring the intent here would have made this pane the
+     only thing in the window with 13px corners — matching a rule nobody sees
+     instead of the panel it is supposed to match. (The dead rule is worth its
+     own change; it is not this one.) */
+  box-shadow: var(--shell-panel-shadow), var(--shell-glass-inner);
+  overflow: hidden;
   animation: note-chat-drawer-in var(--transition);
 }
 @keyframes note-chat-drawer-in {

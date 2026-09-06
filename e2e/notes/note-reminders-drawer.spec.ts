@@ -226,6 +226,10 @@ test("the drawer reaches the top and the tab strip keeps its width clear", async
       drawerLeft: Math.round(drawer.left),
       viewportW: window.innerWidth,
       viewportH: window.innerHeight,
+      sidebar: (() => {
+        const b = document.querySelector(".primary-sidebar")!.getBoundingClientRect();
+        return { left: Math.round(b.left), top: Math.round(b.top), bottom: Math.round(b.bottom) };
+      })(),
     };
   });
 
@@ -244,8 +248,16 @@ test("the drawer reaches the top and the tab strip keeps its width clear", async
   // e2e/settings/settings-modal.spec.ts exists to describe elsewhere.
   expect(layout.stripContentRight).toBeLessThanOrEqual(layout.drawerLeft);
 
-  // Flush to the bottom, with no gap left under it.
-  expect(layout.viewportH - layout.drawerBottom).toBeLessThanOrEqual(2);
+  // The two chrome panels are ONE kind of object: the tool pane's top, bottom
+  // and outer gutter mirror the sidebar's. Stated against the sidebar rather
+  // than against the viewport on purpose — it is the invariant in both skins,
+  // where Studio insets both by a gutter and Paper glues both to the window,
+  // and a viewport-flush assertion would only have been true for one of them.
+  expect(Math.abs(layout.drawerTop - layout.sidebar.top)).toBeLessThanOrEqual(2);
+  expect(Math.abs(layout.drawerBottom - layout.sidebar.bottom)).toBeLessThanOrEqual(2);
+  expect(
+    Math.abs(layout.viewportW - layout.drawerRight - layout.sidebar.left),
+  ).toBeLessThanOrEqual(2);
 });
 
 test("creating from the drawer opens the composer with this note attached", async ({

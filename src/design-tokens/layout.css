@@ -121,19 +121,22 @@
      with a single hairline, the way Notion and Obsidian do it. Every value
      below is what Studio ships, so the default frame is unchanged.
 
-     `--shell-vertical-inset` is the odd one and is called out rather than
-     tidied: the routed editor sizes itself as `100vh` minus this, and the value
-     that ships is 10px, NOT the 2x8px gutter it looks like it should be. The
-     editor therefore overhangs its column by ~6px today. Reproducing that
-     exactly is deliberate — correcting it is a separate change with its own
-     screenshot, not a side effect of adding a skin. */
+     `--shell-vertical-inset` was a wart and is now corrected. It used to ship as
+     a literal 10px — NOT the 2x8px gutter it looks like it should be — so the
+     routed editor overhung its column by ~6px. Harmless while nothing lined up
+     against it; visible the moment the note's tool pane had to sit flush with
+     the sidebar's bottom edge, which is what forced the fix. */
   --shell-gutter: var(--space-2);
-  --shell-vertical-inset: 10px;
+  --shell-vertical-inset: calc(2 * var(--shell-gutter));
   --shell-rail-inset: 10px;
   --shell-panel-radius: var(--radius-xl);
   --shell-panel-shadow: var(--shadow-md);
   --shell-panel-border: 1px solid var(--shell-glass-border);
+  /* The two edges that face a WINDOW edge rather than content: the sidebar's
+     right, the tool pane's left. A flush skin drops the other three and keeps
+     just one of these as the hairline that separates chrome from document. */
   --shell-panel-border-right: var(--shell-panel-border);
+  --shell-panel-border-left: var(--shell-panel-border);
 
   --shell-sidebar-w: calc(var(--space-8) * 4);
 
