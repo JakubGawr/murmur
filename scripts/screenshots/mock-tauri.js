@@ -2089,11 +2089,19 @@ scope to the GA-critical path only.
   // Legacy global some code paths probe.
   window.__TAURI__ = window.__TAURI__ || {};
 
-  // Force the dark theme deterministically (the service reads this key at boot;
-  // default is "system", which a light OS/browser would render light — trap).
+  // Pin the theme deterministically. ThemeService reads this key at boot and
+  // defaults to "system", which would then follow whatever colour scheme the
+  // browser happens to report — so a capture run would not be reproducible.
+  //
+  // It pins to whatever the driver asked for (`window.__demoTheme`), NOT to
+  // "dark". Hardcoding "dark" here is what made the first light run produce
+  // 30 files that were byte-identical to their dark counterparts: the driver
+  // set `colorScheme: "light"` on the context, the app read "dark" out of this
+  // key, and every "-light.png" was a dark screenshot under a light name.
   try {
-    localStorage.setItem("murmur-theme", "dark");
+    var theme = window.__demoTheme === "light" ? "light" : "dark";
+    localStorage.setItem("murmur-theme", theme);
   } catch (_) {
-    /* private mode — colorScheme:'dark' on the context still covers us */
+    /* private mode — the context's colorScheme + "system" default still applies */
   }
 })();
