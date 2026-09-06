@@ -58,4 +58,82 @@ test.describe("Note editor — tab-strip title updates live, independent of save
 
     expect(consoleErrors).toEqual([]);
   });
+
+  /**
+   * The SIDEBAR had the same bug and did not get the same fix (2026-09-06).
+   *
+   * Its rows come from the workspace forest, not from `NotesService`, and
+   * nothing was telling that forest about a rename — so the tree kept showing
+   * the creation-time label ("Untitled", for the note a user is most likely to
+   * be naming) while the tab strip a few pixels away already showed the typed
+   * one.
+   *
+   * Same RED contract as the test above: the save NEVER resolves, so only an
+   * optimistic path can move the row. The default fixture's forest carries no
+   * ITEMS, so this one supplies a forest that does — a sidebar with no note row
+   * in it would pass this test without rendering the thing under test.
+   */
+  test("typing a new title updates the sidebar row too, while the save never resolves", async ({
+    page,
+  }) => {
+    const consoleErrors: string[] = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "error") consoleErrors.push(msg.text());
+    });
+    page.on("pageerror", (err) => consoleErrors.push(String(err)));
+
+    await mockNotes(page, {
+      save_note_text: () => new Promise(() => {}),
+      list_workspace_tree: () => [
+        {
+          id: "p-root",
+          name: "Workspace",
+          kind: "note",
+          level: "project",
+          emoji: null,
+          tint: null,
+          locked: false,
+          unlocked: false,
+          isRoot: true,
+          folders: [],
+          groups: [
+            {
+              kind: "note",
+              total: 1,
+              items: [
+                {
+                  kind: "note",
+                  id: "n1",
+                  title: "My First Note",
+                  durationS: null,
+                  sortAt: 1720050000000,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    await page.goto("/notes");
+    await expect(page.locator(".notes-content")).toBeVisible();
+
+    const sidebar = page.locator(".primary-sidebar");
+    await expect(sidebar.getByText("My First Note", { exact: true })).toBeVisible();
+
+    await page.locator(".title-btn", { hasText: "My First Note" }).click();
+    const titleInput = page.locator(".note-title-input");
+    await expect(titleInput).toHaveValue("My First Note");
+    await titleInput.fill("");
+    await titleInput.type("Renamed while saving");
+
+    await expect(
+      sidebar.getByText("Renamed while saving", { exact: true }),
+    ).toBeVisible({ timeout: 2_000 });
+    await expect(sidebar.getByText("My First Note", { exact: true })).toHaveCount(
+      0,
+    );
+
+    expect(consoleErrors).toEqual([]);
+  });
 });

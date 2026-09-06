@@ -25,6 +25,7 @@ import { RecordingFlushService } from "../../../core/recording-flush.service";
 import { tabKeyFor } from "../../../core/tab-keys";
 import { TabRouteReuseStrategy } from "../../../core/tab-route-reuse.strategy";
 import { TabsService } from "../../../core/tabs.service";
+import { WorkspaceService } from "../../workspace/workspace.service";
 import type {
   AppConfigDto,
   FolderNode,
@@ -203,6 +204,8 @@ const NOTE_REMINDERS_OPEN_KEY = "murmur-note-reminders-open";
 export class NoteEditorComponent {
   private readonly ipc = inject(IpcService);
   private readonly notes = inject(NotesService);
+  /** The sidebar's rows live in this forest; a rename has to reach it too. */
+  private readonly workspace = inject(WorkspaceService);
   private readonly folders = inject(FoldersService);
   private readonly debounce = inject(DebounceService);
   private readonly toast = inject(ToastService);
@@ -965,6 +968,7 @@ export class NoteEditorComponent {
           title.toLowerCase() !== "untitled"
         ) {
           this.tabsService.setTitle(tabKeyFor("note", id), title);
+          this.workspace.applyItemTitle("note", id, title);
         }
       })
       .catch(() => {
@@ -1254,6 +1258,14 @@ export class NoteEditorComponent {
     const doc = this.note();
     if (doc) {
       this.tabsService.setTitle(tabKeyFor("note", doc.id), value || "Untitled");
+      // ...and the SIDEBAR, for the same reason and on the same terms. Its rows
+      // come from the workspace forest, which nothing was telling about a
+      // rename, so the tree kept the creation-time label ("Untitled") while the
+      // tab strip beside it already showed the typed one. Optimistic like the
+      // tab: the user's typed text is the intent, and it survives a save that is
+      // slow or fails. A local patch, not a reload — a container read per
+      // keystroke to change one string we already hold would be absurd.
+      this.workspace.applyItemTitle("note", doc.id, value || null);
     }
     this.scheduleSave();
   }
@@ -1797,6 +1809,7 @@ export class NoteEditorComponent {
       // OPTIMISTICALLY from every keystroke in `onTitleInput` now, so this call
       // is a reconciling no-op in the common case.
       this.tabsService.setTitle(tabKeyFor("note", doc.id), title || "Untitled");
+      this.workspace.applyItemTitle("note", doc.id, title || null);
       return true;
     } catch (e) {
       return this.handleSaveFailure(
@@ -1806,6 +1819,7 @@ export class NoteEditorComponent {
         (updatedAt) => {
           this.note.update((cur) => (cur ? { ...cur, updatedAt } : cur));
           this.tabsService.setTitle(tabKeyFor("note", doc.id), title || "Untitled");
+          this.workspace.applyItemTitle("note", doc.id, title || null);
         },
       );
     }
@@ -1858,6 +1872,7 @@ export class NoteEditorComponent {
       this.saveErrorMessage.set(null);
       // Live tab-title sync (bug fix, 2026-07-12) — see the twin call in {@link saveText}.
       this.tabsService.setTitle(tabKeyFor("note", doc.id), title || "Untitled");
+      this.workspace.applyItemTitle("note", doc.id, title || null);
       return true;
     } catch (e) {
       return this.handleSaveFailure(
@@ -1878,6 +1893,7 @@ export class NoteEditorComponent {
               : cur,
           );
           this.tabsService.setTitle(tabKeyFor("note", doc.id), title || "Untitled");
+          this.workspace.applyItemTitle("note", doc.id, title || null);
         },
       );
     }
