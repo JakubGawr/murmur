@@ -452,6 +452,14 @@
      the document body on purpose — the editor's own chrome (toolbars, the
      properties rail, code blocks) keeps the UI face. */
   font-family: var(--font-reading);
+  /* Reading follows WRITING inside the document: the rendered markdown picks up
+     the same pair the textarea uses, so a paragraph breaks at the same words in
+     both modes and the text no longer shifts when you toggle. Custom properties
+     inherit across component boundaries, so this reaches `.md-body` inside the
+     child renderer without `::ng-deep` — and only inside this subtree, which is
+     why Ask, chat and the panels keep the shared --prose-* metrics. */
+  --prose-size: var(--note-size);
+  --prose-leading: var(--note-leading);
   transition: max-width var(--transition);
 }
 .note-doc.is-full-width {
@@ -717,8 +725,8 @@
   /* The textarea and its hidden `::after` mirror MUST stay typographically
      identical or the auto-grow measurement drifts — that is why they share one
      rule, and why these are one pair of tokens rather than two. */
-  font-size: var(--note-write-size);
-  line-height: var(--note-write-leading);
+  font-size: var(--note-size);
+  line-height: var(--note-leading);
   padding: 0;
   border: 0;
   margin: 0;
