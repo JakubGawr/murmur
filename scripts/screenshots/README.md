@@ -12,7 +12,7 @@ so the marketing shots are honest UI, privacy-safe by construction.
 # 1. serve the frontend (no Rust core needed — the mock replaces Tauri)
 npx ng serve --host 127.0.0.1 --port 4310 --watch=false
 
-# 2. capture every shot into docs/screenshots/ (dark theme, 2× retina)
+# 2. capture every shot into docs/screenshots/ (both themes, 2× retina)
 MURMUR_URL=http://127.0.0.1:4310 bash scripts/screenshots/run.sh
 
 # …or a subset:
@@ -28,6 +28,29 @@ screenshots that Rust build buys you nothing.
 > **`ng serve --watch=false` does not pick up edits.** If you change anything under
 > `src/` — including a string that appears in a shot — restart the server or the
 > capture will silently photograph the previous build.
+
+## Light and dark
+
+Every shot is captured **twice**: `<name>.png` (dark) and `<name>-light.png`. The
+landing page swaps between them with its own theme switch, so a reader on a light
+page is not shown a dark app.
+
+Nothing about the app is poked to get the light one. `ThemeService` defaults to
+`system` and `design-tokens/theme-light.css` keys that mode on
+`prefers-color-scheme`, so the browser's colour scheme is the entire switch: the
+driver passes `colorScheme` to `browser.newContext` and the app follows.
+
+```bash
+MURMUR_SHOT_THEME=dark  bash scripts/screenshots/run.sh   # dark only
+MURMUR_SHOT_THEME=light bash scripts/screenshots/run.sh   # light only
+# default is `both` — a half-refreshed set is worse than a uniformly old one,
+# because nothing on the page tells a reader which half they are looking at.
+```
+
+Dark keeps the bare filename, so every existing reference to a shot still
+resolves. On the landing page the markup `src` is always the dark file and the
+swap is JS on top, so a reader with no JS — and a light shot not yet captured —
+both degrade to the dark image rather than a broken one.
 
 ## The two guarantees
 

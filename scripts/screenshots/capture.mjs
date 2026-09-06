@@ -3,13 +3,21 @@
  *
  * Renders the REAL shipping Angular UI (ng serve) over a mocked Tauri IPC layer
  * plus a privacy-safe demo world (./mock-tauri.js), then captures each screen at
- * 2× retina in the dark theme. No real vault / DB / mic / network is touched —
- * see ./README.md.
+ * 2× retina. No real vault / DB / mic / network is touched — see ./README.md.
+ *
+ * THEMES. The app defaults to `system` (ThemeService.read()), and its light tokens
+ * key on `prefers-color-scheme` in that mode (design-tokens/theme-light.css) — so
+ * the browser's colour scheme is the whole switch, and no app state is touched to
+ * get a light capture. A light shot is written as `<name>-light.png` beside the
+ * dark one, which is what lets the landing page swap screenshots with its own
+ * theme switch instead of showing a dark app on a light page.
  *
  * Usage:
  *   PLAYWRIGHT_PATH=<npx-cache>/node_modules/playwright node scripts/screenshots/capture.mjs [name...]
  * (the wrapper ./run.sh resolves PLAYWRIGHT_PATH for you). Pass shot names to
  * capture a subset, e.g. `... capture.mjs dashboard tasks`.
+ *
+ *   MURMUR_SHOT_THEME=dark|light|both   (default: both)
  *
  * TWO GUARANTEES THIS FILE ENFORCES, because a marketing image is published and
  * cannot be un-published:
@@ -38,6 +46,20 @@ const OUT = process.env.MURMUR_SHOT_DIR || join(ROOT, "docs", "screenshots");
 const MOCK = readFileSync(join(__dirname, "mock-tauri.js"), "utf8");
 const BASE = process.env.MURMUR_URL || "http://localhost:1420";
 const VERSION = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).version;
+
+/** Which colour schemes to capture. `both` is the default: a set that is half
+ *  refreshed is worse than one that is uniformly old, because nothing on the page
+ *  tells you which half. */
+const THEMES = (() => {
+  const v = (process.env.MURMUR_SHOT_THEME || "both").toLowerCase();
+  if (v === "dark" || v === "light") return [v];
+  if (v === "both") return ["dark", "light"];
+  console.error(`✗ MURMUR_SHOT_THEME must be dark | light | both (got "${v}")`);
+  process.exit(1);
+})();
+
+/** Dark keeps the bare name so every existing reference to a shot still resolves. */
+const shotFile = (name, theme) => (theme === "light" ? `${name}-light` : name);
 
 const EVENT_STATUS = "meetnotes://status";
 const EVENT_LIVE_CAPTION = "murmur://live-caption";
@@ -551,17 +573,23 @@ async function main() {
   const names = wanted.length ? wanted : Object.keys(SHOTS);
   const browser = await chromium.launch();
   let ok = 0;
+  let planned = 0;
   const refused = [];
+  const jobs = [];
   for (const name of names) {
-    const shot = SHOTS[name];
-    if (!shot) {
+    if (!SHOTS[name]) {
       console.error(`✗ unknown shot: ${name}`);
       continue;
     }
+    for (const theme of THEMES) jobs.push([name, theme]);
+  }
+  planned = jobs.length;
+  for (const [name, theme] of jobs) {
+    const shot = SHOTS[name];
     const ctx = await browser.newContext({
       viewport: shot.viewport,
       deviceScaleFactor: 2,
-      colorScheme: "dark",
+      colorScheme: theme,
       locale: "en-US",
     });
     const page = await ctx.newPage();
@@ -582,22 +610,22 @@ async function main() {
       await shot.run(page);
       const leaks = await privacyViolations(page);
       if (leaks.length) {
-        refused.push(name);
-        console.error(`⛔ ${name}: REFUSED — ${leaks.join("; ")}`);
+        refused.push(`${name} (${theme})`);
+        console.error(`⛔ ${name} [${theme}]: REFUSED — ${leaks.join("; ")}`);
         continue;
       }
-      const out = join(OUT, `${name}.png`);
+      const out = join(OUT, `${shotFile(name, theme)}.png`);
       await page.screenshot({ path: out });
-      console.log(`✓ ${name} → ${out}${errs.length ? `  (console errors: ${errs.length})` : ""}`);
+      console.log(`✓ ${name} [${theme}] → ${out}${errs.length ? `  (console errors: ${errs.length})` : ""}`);
       ok++;
     } catch (e) {
-      console.error(`✗ ${name}: ${e.message.split("\n")[0]}`);
+      console.error(`✗ ${name} [${theme}]: ${e.message.split("\n")[0]}`);
     } finally {
       await ctx.close();
     }
   }
   await browser.close();
-  console.log(`\n${ok}/${names.length} shots captured → ${OUT}`);
+  console.log(`\n${ok}/${planned} shots captured (${THEMES.join(" + ")}) → ${OUT}`);
   if (refused.length) {
     console.error(`REFUSED for privacy: ${refused.join(", ")}`);
     process.exitCode = 1;

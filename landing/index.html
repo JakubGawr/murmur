@@ -6,6 +6,7 @@
   <title>Murmur — local-first meeting notes with a brain</title>
   <meta name="description" content="Murmur records meetings and transcribes them on-device. Run AI locally, or explicitly opt into redacted cloud AI; your meeting archive stays on your Mac." />
   <link rel="icon" href="./assets/icon.svg" />
+  <link rel="preload" as="font" type="font/woff2" href="./assets/fonts/hanken-grotesk.woff2" crossorigin />
   <meta property="og:title" content="Murmur — local-first meeting notes with a brain" />
   <meta property="og:description" content="On-device transcription for macOS. Run AI locally or explicitly opt into redacted cloud AI." />
   <meta property="og:type" content="website" />
@@ -18,6 +19,28 @@
     })();
   </script>
   <style>
+    /* ── The app's own type, self-hosted ──────────────────────────────────
+       Murmur ships "Hanken Grotesk" (src/styles.css @font-face, variable woff2,
+       35 kB) and sets every screen in it. This page was set in SF Pro, so the
+       product screenshots below — rendered in Hanken Grotesk — always read as a
+       different product from the page around them. Same files, copied into
+       landing/assets/fonts/ so the page has no runtime dependency on the app
+       tree and no third-party font request.
+       ───────────────────────────────────────────────────────────────────── */
+    @font-face {
+      font-family: "Hanken Grotesk";
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url("./assets/fonts/hanken-grotesk.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "JetBrains Mono";
+      font-style: normal;
+      font-weight: 100 800;
+      font-display: swap;
+      src: url("./assets/fonts/jetbrains-mono.woff2") format("woff2");
+    }
     /* ─────────────────────────────────────────────────────────────
        Quiet Glass tokens — mirrored from the shipping app
        (src/design-tokens/*.css) so the site and the product read as
@@ -61,8 +84,9 @@
       --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.35);
       --shadow-lg: 0 22px 56px rgba(0, 0, 0, 0.48);
 
-      --font: -apple-system, "SF Pro Display", "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
-      --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+      /* Mirrors --font-sans in src/design-tokens/typography.css. */
+      --font: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 
       --maxw: 1120px;
       color-scheme: dark;
@@ -655,7 +679,7 @@
             </tbody>
           </table>
         </div>
-        <div class="shot" style="margin-top:32px"><img src="./assets/settings-privacy.png" alt="Murmur's privacy settings, stating in plain language what is removed before any text leaves, which providers are cloud, and that cloud processing is off until you allow it once" loading="lazy" /></div>
+        <div class="shot" style="margin-top:32px"><img data-shot="settings-privacy" src="./assets/settings-privacy.png" alt="Murmur's privacy settings, stating in plain language what is removed before any text leaves, which providers are cloud, and that cloud processing is off until you allow it once" loading="lazy" /></div>
         <div class="egress-foot">Murmur tells you, in plain language, exactly what leaves your Mac — and every cloud AI call is logged and shown back to you. Your meetings stay on-device unless you opt in. One model picker is used across every AI surface, and it always accepts a model id you type yourself — so a model released after this build still works.</div>
       </div>
     </div>
@@ -689,7 +713,7 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Deleted by mistake? Trash keeps it for 30 days — or however long you set, up to a year</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/hero-spaces.png" alt="The Workspaces sidebar: one tree of Workspaces and folders holding recordings, notes and boards, with a locked Workspace at the bottom" loading="lazy" /></div>
+        <div class="shot"><img data-shot="hero-spaces" src="./assets/hero-spaces.png" alt="The Workspaces sidebar: one tree of Workspaces and folders holding recordings, notes and boards, with a locked Workspace at the bottom" loading="lazy" /></div>
       </div>
 
       <div class="feature flip reveal">
@@ -703,7 +727,7 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> A board states its own boundary: what it can read, and what it derived</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/dashboard.png" alt="A board in its Brief lens: a pinned living answer, what needs attention, and the recent evidence behind it" loading="lazy" /></div>
+        <div class="shot"><img data-shot="dashboard" src="./assets/dashboard.png" alt="A board in its Brief lens: a pinned living answer, what needs attention, and the recent evidence behind it" loading="lazy" /></div>
       </div>
 
       <div class="feature reveal">
@@ -717,7 +741,7 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Imported notes land in their own named folder, and join the same Brain</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/settings-imports.png" alt="Settings → Imports: Notion, Obsidian and Apple Notes, with the note that everything happens on this Mac and nothing is uploaded" loading="lazy" /></div>
+        <div class="shot"><img data-shot="settings-imports" src="./assets/settings-imports.png" alt="Settings → Imports: Notion, Obsidian and Apple Notes, with the note that everything happens on this Mac and nothing is uploaded" loading="lazy" /></div>
       </div>
 
       <!-- Feature 1 -->
@@ -732,7 +756,7 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Optional consent-gated web — off by default</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/record-brain.png" alt="A recording in progress with a question asked mid-meeting, answered live from the meeting memory with the sources it drew on" loading="lazy" /></div>
+        <div class="shot"><img data-shot="record-brain" src="./assets/record-brain.png" alt="A recording in progress with a question asked mid-meeting, answered live from the meeting memory with the sources it drew on" loading="lazy" /></div>
       </div>
 
       <!-- Ask, at vault scale — the surface ask.png actually shows. Scoping is
@@ -749,7 +773,7 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> A conversation disappears the instant any folder it drew on stops being readable</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/ask.png" alt="Asking across months of meetings and getting one answer, with the meetings it was drawn from listed underneath" loading="lazy" /></div>
+        <div class="shot"><img data-shot="ask" src="./assets/ask.png" alt="Asking across months of meetings and getting one answer, with the meetings it was drawn from listed underneath" loading="lazy" /></div>
       </div>
 
       <!-- Feature 2 -->
@@ -764,7 +788,7 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> A floating recorder bar — record from anywhere (⌘⇧R)</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/transcript.png" alt="The merged Me / Others transcript, time-indexed, beside the speaker and topic timeline" loading="lazy" /></div>
+        <div class="shot"><img data-shot="transcript" src="./assets/transcript.png" alt="The merged Me / Others transcript, time-indexed, beside the speaker and topic timeline" loading="lazy" /></div>
       </div>
 
       <!-- Feature 3 -->
@@ -781,7 +805,7 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Feed it PDFs, Office docs, web pages &amp; images — chunked into the same brain, on-device</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/full-brain-graph.png" alt="The full brain graph — meetings, notes, documents and people as one map, with typed links between them" loading="lazy" /></div>
+        <div class="shot"><img data-shot="full-brain-graph" src="./assets/full-brain-graph.png" alt="The full brain graph — meetings, notes, documents and people as one map, with typed links between them" loading="lazy" /></div>
       </div>
 
       <!-- Feature: Receipts -->
@@ -797,7 +821,7 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Sealed folders leak no timing or speaker, ever</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/detail-receipts.png" alt="A generated note's receipts: one row per grounded claim, each carrying the speaker and the second of audio it came from" loading="lazy" /></div>
+        <div class="shot"><img data-shot="detail-receipts" src="./assets/detail-receipts.png" alt="A generated note's receipts: one row per grounded claim, each carrying the speaker and the second of audio it came from" loading="lazy" /></div>
       </div>
 
       <!-- Feature 4 -->
@@ -812,7 +836,7 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Plain Markdown exports you can open in any editor</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/detail-note.png" alt="A structured note — summary, decisions, action items and quotes — beside the recordings and notes it links to" loading="lazy" /></div>
+        <div class="shot"><img data-shot="detail-note" src="./assets/detail-note.png" alt="A structured note — summary, decisions, action items and quotes — beside the recordings and notes it links to" loading="lazy" /></div>
       </div>
 
       <!-- Feature 5 -->
@@ -827,7 +851,7 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Paste screenshots into notes; they stay local and follow the Workspace&rsquo;s lock</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/notes-editor-brain-menu.png" alt="The standalone note editor with a text selection and the Brain command menu open, showing Refine, Shorten, Change tone and more actions" loading="lazy" /></div>
+        <div class="shot"><img data-shot="notes-editor-brain-menu" src="./assets/notes-editor-brain-menu.png" alt="The standalone note editor with a text selection and the Brain command menu open, showing Refine, Shorten, Change tone and more actions" loading="lazy" /></div>
       </div>
 
       <!-- Feature 6 -->
@@ -844,7 +868,7 @@
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Shared <b>Tasks</b> — assignees, due dates, subtasks and the same permissions. Tasks live inside an org, so they need a signed-in account.</li>
           </ul>
         </div>
-        <div class="shot"><img src="./assets/shared-brains.png" alt="The Shared Brains view: meetings and notes your organizations have shared with you, each with its author and organization" loading="lazy" /></div>
+        <div class="shot"><img data-shot="shared-brains" src="./assets/shared-brains.png" alt="The Shared Brains view: meetings and notes your organizations have shared with you, each with its author and organization" loading="lazy" /></div>
       </div>
     </div>
   </section>
@@ -981,8 +1005,36 @@
       var KEY = "murmur-theme";
       var root = document.documentElement;
       var sw = document.querySelector(".theme-switch");
+      // Screenshots follow the theme. A dark app pictured on a light page is the
+      // single loudest way a product page can look unmaintained — and the capture
+      // harness now emits `<name>-light.png` beside every shot for exactly this.
+      // Only ONE file per shot is ever fetched: the src is repointed, not doubled
+      // up with a hidden second <img>.
+      function applyShots(mode) {
+        var light = mode === "light" ||
+          (mode === "system" && window.matchMedia &&
+           window.matchMedia("(prefers-color-scheme: light)").matches);
+        var imgs = document.querySelectorAll("img[data-shot]");
+        for (var i = 0; i < imgs.length; i++) {
+          var el = imgs[i];
+          var name = el.getAttribute("data-shot");
+          var want = "./assets/" + name + (light ? "-light" : "") + ".png";
+          if (el.getAttribute("src") === want) continue;
+          // A light capture that has not been taken yet must not leave a broken
+          // image on the page — fall back to the dark file that always exists.
+          if (light && !el.hasAttribute("data-shot-fallback")) {
+            el.setAttribute("data-shot-fallback", "1");
+            el.addEventListener("error", function () {
+              this.setAttribute("src", "./assets/" + this.getAttribute("data-shot") + ".png");
+            });
+          }
+          el.setAttribute("src", want);
+        }
+      }
+
       function apply(mode) {
         root.setAttribute("data-theme", mode);
+        applyShots(mode);
         if (!sw) return;
         var btns = sw.querySelectorAll("button");
         for (var i = 0; i < btns.length; i++) {
@@ -994,6 +1046,14 @@
       var saved = "system";
       try { saved = localStorage.getItem(KEY) || "system"; } catch (e) {}
       apply(saved);
+      // Follow the OS while the mode is "system" — otherwise a reader who flips
+      // macOS to light keeps a page of dark screenshots.
+      if (window.matchMedia) {
+        var mq = window.matchMedia("(prefers-color-scheme: light)");
+        var onMq = function () { if (root.getAttribute("data-theme") === "system") applyShots("system"); };
+        if (mq.addEventListener) mq.addEventListener("change", onMq);
+        else if (mq.addListener) mq.addListener(onMq);
+      }
       if (sw) {
         sw.addEventListener("click", function (e) {
           var btn = e.target.closest ? e.target.closest("button[data-theme-set]") : null;

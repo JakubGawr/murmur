@@ -14,6 +14,28 @@
     })();
   </script>
   <style>
+    /* ── The app's own type, self-hosted ──────────────────────────────────
+       Murmur ships "Hanken Grotesk" (src/styles.css @font-face, variable woff2,
+       35 kB) and sets every screen in it. This page was set in SF Pro, so the
+       product screenshots below — rendered in Hanken Grotesk — always read as a
+       different product from the page around them. Same files, copied into
+       landing/assets/fonts/ so the page has no runtime dependency on the app
+       tree and no third-party font request.
+       ───────────────────────────────────────────────────────────────────── */
+    @font-face {
+      font-family: "Hanken Grotesk";
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url("./assets/fonts/hanken-grotesk.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "JetBrains Mono";
+      font-style: normal;
+      font-weight: 100 800;
+      font-display: swap;
+      src: url("./assets/fonts/jetbrains-mono.woff2") format("woff2");
+    }
     /* ─────────────────────────────────────────────────────────────
        Same Quiet Glass tokens as index.html, kept in sync manually
        for this PoC (src/design-tokens/*.css mirrors these too).
@@ -55,8 +77,9 @@
       --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.35);
       --shadow-lg: 0 22px 56px rgba(0, 0, 0, 0.48);
 
-      --font: -apple-system, "SF Pro Display", "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
-      --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+      /* Mirrors --font-sans in src/design-tokens/typography.css. */
+      --font: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 
       --maxw: 1320px;
       color-scheme: dark;
