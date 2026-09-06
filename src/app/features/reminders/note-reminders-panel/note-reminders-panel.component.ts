@@ -6,13 +6,12 @@ import {
   inject,
   input,
   output,
-  signal,
 } from "@angular/core";
-import { MurIconComponent } from "../../../design-system/icon/icon.component";
 import type { ReminderView } from "../../../core/models";
 import { ReminderComposerService } from "../reminder-composer/reminder-composer.service";
 import { RemindersStore } from "../reminders.store";
 import { anchoredTo, reminderRow, type ReminderRowVm } from "../reminder-row";
+import { ReminderRowComponent } from "../reminder-row/reminder-row.component";
 
 /**
  * The note's own reminder drawer: create a follow-up anchored to this note, and
@@ -39,7 +38,7 @@ import { anchoredTo, reminderRow, type ReminderRowVm } from "../reminder-row";
 @Component({
   selector: "app-note-reminders-panel",
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MurIconComponent],
+  imports: [ReminderRowComponent],
   templateUrl: "./note-reminders-panel.component.html",
   styleUrl: "./note-reminders-panel.component.scss",
 })
@@ -50,9 +49,6 @@ export class NoteRemindersPanelComponent {
   readonly noteId = input.required<string>();
   /** Emitted by the drawer's own close control; the editor owns the toggle. */
   readonly closed = output<void>();
-
-  /** Which reminder the delete confirmation is currently armed for. */
-  readonly confirmingDelete = signal<string | null>(null);
 
   private readonly mine = (reminder: ReminderView): boolean =>
     anchoredTo(reminder, "note", this.noteId());
@@ -118,47 +114,5 @@ export class NoteRemindersPanelComponent {
     this.composer.openCreate({
       source: { kind: "note", id: this.noteId(), title: "" },
     });
-  }
-
-  edit(reminder: ReminderView): void {
-    this.composer.openEdit(reminder);
-  }
-
-  /** The circle, both ways. A finished reminder goes back to open at the same
-   * due time; an open one is completed. Which direction is decided from the
-   * row's own state rather than from the group it was rendered in, so the two
-   * can never disagree. */
-  async toggle(row: ReminderRowVm): Promise<void> {
-    const action =
-      row.reminder.state === "completed"
-        ? this.store.reopen(row.reminder.id, row.expectedDueAt)
-        : this.store.complete(row.reminder.id, row.expectedDueAt);
-    await action.catch(() => {
-      // The store surfaces the failure through its own error signal.
-    });
-  }
-
-  async dismiss(row: ReminderRowVm): Promise<void> {
-    if (!row.occurrenceId) {
-      return;
-    }
-    await this.store.dismissOccurrence(row.occurrenceId).catch(() => {
-      // Reported by the store.
-    });
-  }
-
-  askDelete(reminderId: string): void {
-    this.confirmingDelete.set(reminderId);
-  }
-
-  cancelDelete(): void {
-    this.confirmingDelete.set(null);
-  }
-
-  async confirmDelete(reminderId: string): Promise<void> {
-    await this.store.delete(reminderId).catch(() => {
-      // Reported by the store.
-    });
-    this.confirmingDelete.set(null);
   }
 }

@@ -8,30 +8,16 @@
   margin: 0 auto;
   padding: var(--space-6) var(--space-5) var(--space-8);
 }
-
-.page-head,
-.reminder-title-row,
-.reminder-meta,
-.reminder-actions,
-.source-chips,
-.delete-confirm,
-.delete-confirm > div {
+.page-head {
   display: flex;
   align-items: center;
-}
-
-.page-head {
   justify-content: space-between;
   gap: var(--space-5);
   margin-bottom: var(--space-5);
 }
-
 .page-head h1,
 .page-head p,
-.reminder-group h2,
-.reminder-card h3,
-.reminder-details,
-.delete-confirm span {
+.reminder-group h2 {
   margin: 0;
 }
 
@@ -104,102 +90,16 @@
 }
 
 .reminder-list {
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
-
-.reminder-card {
-  position: relative;
+/* The rows are `app-reminder-row`, shared with the note's drawer — this list
+   only says where they go. The gap tightens with them: the old card carried its
+   own action bar and needed air around it; these do not. */
+.reminder-list app-reminder-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  overflow: hidden;
-}
-
-.reminder-main {
-  min-width: 0;
-}
-
-.reminder-title-row {
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.reminder-meta,
-.source-chips,
-.reminder-actions {
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.reminder-meta {
-  margin-top: var(--space-2);
-  color: var(--text-muted);
-  font-size: 0.8125rem;
-}
-
-.reminder-details {
-  margin-top: var(--space-3);
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-}
-
-.smart-badge,
-.source-chip {
-  border-radius: var(--radius-pill);
-}
-
-.smart-badge {
-  padding: var(--space-1) var(--space-2);
-  background: var(--accent-soft);
-  color: var(--accent-hover);
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.source-chips {
-  margin-top: var(--space-3);
-}
-
-.source-chip {
-  max-width: 100%;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--border);
-  background: var(--surface-input);
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.source-chip:hover {
-  border-color: var(--border-strong);
-  color: var(--text-primary);
-}
-
-.reminder-actions {
-  justify-content: flex-end;
-  align-self: start;
-}
-
-.danger-action {
-  color: var(--danger);
-}
-
-.delete-confirm {
-  grid-column: 1 / -1;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
-}
-
-.delete-confirm > div {
-  gap: var(--space-2);
 }
 
 .loading-orb {
@@ -231,18 +131,8 @@
   .reminders-page {
     padding-inline: var(--space-3);
   }
-
-  .page-head,
-  .delete-confirm {
+.page-head {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .reminder-card {
-    grid-template-columns: 1fr;
-  }
-
-  .reminder-actions {
-    justify-content: flex-start;
   }
 }

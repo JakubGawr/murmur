@@ -315,7 +315,7 @@ test("Reminders: source invalidation masks a cached title before canonical refre
 
   await page.goto("/reminders");
   const sourceChip = page
-    .locator(".source-chip")
+    .locator(".row-source")
     .filter({ hasText: "Sealed source title" });
   await expect(sourceChip).toBeVisible();
 
@@ -525,7 +525,7 @@ test("Reminder composer: source invalidation closes and purges an open edit", as
   await page.goto("/reminders");
   await expect(page.getByText("Composer reminder")).toBeVisible();
   await page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Composer reminder" })
     .getByRole("button", { name: "Edit" })
     .click();
@@ -655,7 +655,7 @@ test("Reminders: global visibility invalidation purges every cached source and c
   await page.goto("/reminders");
   await expect(page.getByText("Global inbox source")).toBeVisible();
   await page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Global inbox reminder" })
     .getByRole("button", { name: "Edit" })
     .click();
@@ -1206,7 +1206,7 @@ test("Reminder composer: a request created before the listener barrier is discar
 
   await page.goto("/reminders");
   const reminder = page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Source-bearing edit request" });
   await expect(
     reminder.getByText("Composer private source title"),
@@ -1440,7 +1440,7 @@ test("Reminder composer: focus, source limit, and busy source locking stay coher
 
   await page.goto("/reminders");
   const row = page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Twenty-source reminder" });
   const edit = row.getByRole("button", { name: "Edit" });
   const composer = page.locator("app-reminder-composer");
@@ -2256,13 +2256,15 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
 
   // Inbox confirm-then-refresh actions.
   await page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Book the pilot review" })
-    .getByRole("button", { name: "Complete" })
+    // Complete is the CIRCLE now (Apple Reminders' shape), so it is addressed by
+    // role `checkbox` and by what a click will DO, not by a button label.
+    .getByRole("checkbox", { name: /^Complete / })
     .click();
   await expect(page.getByText("Book the pilot review")).toHaveCount(0);
   await page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Send the roadmap follow-up" })
     .getByRole("button", { name: "Dismiss" })
     .click();
@@ -2270,10 +2272,10 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
 
   await page.getByRole("button", { name: "Upcoming" }).click();
   const recurringUpcoming = page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Book the pilot review" });
   const dismissedOneOff = page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Send the roadmap follow-up" });
   await expect(recurringUpcoming).toBeVisible();
   await expect(dismissedOneOff).toBeVisible();
@@ -2356,7 +2358,7 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
   // Meeting context: manual source prefill, Escape in-dialog, explicit
   // suggestion dismiss, then edit-before-accept with Smart provenance.
   await page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Confirm the Atlas launch owner" })
     .getByRole("button", { name: /Meeting · Q2 Roadmap Planning/ })
     .click();

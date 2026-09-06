@@ -1,0 +1,204 @@
+/* ONE reminder row, shared by the note drawer and the Reminders page.
+
+   THREE COLUMNS, Apple Reminders' shape: the completion circle, the text, the
+   icon actions. What this replaced on the page was a full-width bar of three
+   text buttons under every row — four lines of chrome for one line of content.
+   The circle absorbs Complete outright; the other two shrink to glyphs.
+
+   The host IS the row, so its box lives in `:host` and the page/drawer only say
+   where rows go. Neither owns a copy of this. */
+:host {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-input);
+}
+:host(.is-done) {
+  opacity: 0.6;
+}
+:host(.is-done) .row-title span:first-child {
+  text-decoration: line-through;
+}
+
+/* The circle. Hollow while the reminder is open; the check fades in and the
+   ring fills once it is done — the state change people expect from a checkbox,
+   done with opacity so nothing in the row moves. Sized against the title's own
+   line box so it sits on the first line rather than floating above it. */
+.row-check {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: -1px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+.row-check:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--surface-hover);
+}
+.row-check:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.row-check .check-mark {
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+.row-check:hover:not(:disabled) .check-mark {
+  opacity: 0.45;
+}
+.row-check[aria-checked="true"]:hover:not(:disabled) .check-mark {
+  opacity: 1;
+}
+/* Completed: filled ring, solid check — and still a live control, because the
+   circle un-ticks as well as ticks. */
+.row-check[aria-checked="true"] {
+  color: var(--accent);
+}
+/* Hovering a finished one dims the fill, the way hovering an open one shows a
+   faint check: in both directions the hint previews the OTHER state. */
+.row-check[aria-checked="true"]:hover:not(:disabled) {
+  color: var(--accent-hover);
+  opacity: 0.75;
+}
+.row-check[aria-checked="true"] .check-ring {
+  fill: currentColor;
+}
+.row-check[aria-checked="true"] .check-mark {
+  opacity: 1;
+  stroke: var(--text-on-accent);
+}
+
+.row-body {
+  min-width: 0;
+  padding-top: 1px;
+}
+.row-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.smart-badge {
+  flex: none;
+  color: var(--accent-text);
+  font-size: 0.72rem;
+}
+.row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+/* Two lines of detail, then an ellipsis. The drawer is a glance surface; a long
+   note in one row would push every other reminder out of view, and the full
+   text is one Edit away. */
+.row-details {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* Actions ride the first line and stay in the layout at all times — revealed by
+   OPACITY, never `display`, so hovering cannot reflow the list. Focus-within
+   keeps the keyboard path visible, and a pending delete confirmation pins them
+   open regardless of the pointer. */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+:host(:hover) .row-actions,
+:host(:focus-within) .row-actions,
+.row-actions.is-confirm {
+  opacity: 1;
+}
+.row-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.row-icon-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.row-icon-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.row-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.row-icon-btn.is-danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+.confirm-copy {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+/* The anchors this reminder came from. Page-only: in the note drawer every row
+   is anchored to the note already on screen, so chips there are pure noise. */
+.row-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+.row-source {
+  max-width: 100%;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 0.72rem;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+.row-source:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+.row-source:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}

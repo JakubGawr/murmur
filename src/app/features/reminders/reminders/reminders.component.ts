@@ -7,11 +7,9 @@ import {
   signal,
 } from "@angular/core";
 import { TabsService } from "../../../core/tabs.service";
-import type {
-  ReminderSourceView,
-  ReminderView,
-} from "../../../core/models";
+import type { ReminderSourceView } from "../../../core/models";
 import { ReminderComposerService } from "../reminder-composer/reminder-composer.service";
+import { ReminderRowComponent } from "../reminder-row/reminder-row.component";
 import { reminderRow, type ReminderRowVm } from "../reminder-row";
 import { RemindersStore } from "../reminders.store";
 
@@ -31,6 +29,7 @@ const MONTH_YEAR = new Intl.DateTimeFormat(undefined, {
 @Component({
   selector: "app-reminders",
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ReminderRowComponent],
   templateUrl: "./reminders.component.html",
   styleUrl: "./reminders.component.scss",
 })
@@ -40,7 +39,6 @@ export class RemindersComponent implements OnInit {
   private readonly tabs = inject(TabsService);
 
   readonly segment = signal<ReminderSegment>("inbox");
-  readonly confirmingDelete = signal<string | null>(null);
 
   readonly counts = computed(() => ({
     inbox: this.store.inbox().length,
@@ -118,49 +116,20 @@ export class RemindersComponent implements OnInit {
   }
 
   selectSegment(segment: ReminderSegment): void {
+    // No delete-confirmation to reset any more: each row owns its own, and a
+    // segment switch destroys the rows outright.
     this.segment.set(segment);
-    this.confirmingDelete.set(null);
   }
 
   newReminder(): void {
     this.composer.openCreate();
   }
 
-  edit(reminder: ReminderView): void {
-    this.composer.openEdit(reminder);
-  }
 
-  async complete(row: ReminderRowVm): Promise<void> {
-    await this.store.complete(row.reminder.id, row.expectedDueAt).catch(() => {
-      // Store owns the visible error state.
-    });
-  }
 
-  async dismiss(row: ReminderRowVm): Promise<void> {
-    if (!row.occurrenceId) {
-      return;
-    }
-    await this.store.dismissOccurrence(row.occurrenceId).catch(() => {
-      // Store owns the visible error state.
-    });
-  }
 
-  askDelete(reminderId: string): void {
-    this.confirmingDelete.set(reminderId);
-  }
 
-  cancelDelete(): void {
-    this.confirmingDelete.set(null);
-  }
 
-  async delete(reminderId: string): Promise<void> {
-    await this.store
-      .delete(reminderId)
-      .then(() => this.confirmingDelete.set(null))
-      .catch(() => {
-        // Store owns the visible error state.
-      });
-  }
 
   openSource(source: ReminderSourceView): void {
     if (source.kind === "meeting") {

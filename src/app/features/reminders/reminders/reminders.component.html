@@ -83,119 +83,13 @@
           <h2 [id]="'group-' + group.id">{{ group.label }}</h2>
           <ul class="reminder-list">
             @for (row of group.rows; track row.key) {
-              <li class="card reminder-card">
-                <div class="reminder-main">
-                  <div class="reminder-title-row">
-                    <h3>{{ row.reminder.title }}</h3>
-                    @if (row.reminder.origin === "smart") {
-                      <span
-                        class="smart-badge"
-                        title="Created from a reviewed Smart suggestion"
-                      >
-                        ✦ Smart
-                      </span>
-                    }
-                  </div>
-                  <div class="reminder-meta">
-                    <span>{{ row.dueLabel }}</span>
-                    @if (row.recurrenceLabel; as recurrence) {
-                      <span>↻ {{ recurrence }}</span>
-                    }
-                  </div>
-                  @if (row.reminder.details; as details) {
-                    <p class="reminder-details">{{ details }}</p>
-                  }
-                  @if (row.reminder.sources.length > 0) {
-                    <div class="source-chips" aria-label="Reminder sources">
-                      @for (
-                        source of row.reminder.sources;
-                        track source.kind + source.id
-                      ) {
-                        <button
-                          type="button"
-                          class="source-chip"
-                          (click)="openSource(source)"
-                        >
-                          {{ source.kind === "meeting" ? "Meeting" : "Note" }} ·
-                          {{ source.title }}
-                        </button>
-                      }
-                    </div>
-                  }
-                </div>
-
-                <div class="reminder-actions">
-                  @if (segment() !== "completed") {
-                    <button
-                      type="button"
-                      class="btn btn-primary"
-                      [disabled]="
-                        store.busy().has(row.key) ||
-                        store.busy().has(row.reminder.id)
-                      "
-                      (click)="complete(row)"
-                    >
-                      Complete
-                    </button>
-                    @if (row.occurrenceId) {
-                      <button
-                        type="button"
-                        class="btn btn-ghost"
-                        [disabled]="
-                          store.busy().has(row.occurrenceId) ||
-                          store.busy().has(row.reminder.id)
-                        "
-                        (click)="dismiss(row)"
-                      >
-                        Dismiss
-                      </button>
-                    }
-                  }
-                  <button
-                    type="button"
-                    class="btn btn-ghost"
-                    [disabled]="store.busy().has(row.reminder.id)"
-                    (click)="edit(row.reminder)"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-ghost danger-action"
-                    [disabled]="store.busy().has(row.reminder.id)"
-                    (click)="askDelete(row.reminder.id)"
-                  >
-                    Delete
-                  </button>
-                </div>
-
-                @if (confirmingDelete() === row.reminder.id) {
-                  <div
-                    class="delete-confirm"
-                    role="alertdialog"
-                    aria-label="Delete reminder"
-                  >
-                    <span>Delete this reminder permanently?</span>
-                    <div>
-                      <button
-                        type="button"
-                        class="btn btn-ghost"
-                        [disabled]="store.busy().has(row.reminder.id)"
-                        (click)="cancelDelete()"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-danger"
-                        [disabled]="store.busy().has(row.reminder.id)"
-                        (click)="delete(row.reminder.id)"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                }
+              <li>
+                <app-reminder-row
+                  [row]="row"
+                  [class.is-done]="segment() === 'completed'"
+                  [showSources]="true"
+                  (openSource)="openSource($event)"
+                />
               </li>
             }
           </ul>
