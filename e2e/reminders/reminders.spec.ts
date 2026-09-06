@@ -2307,7 +2307,16 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
       };
     }),
   ).toEqual({ state: "active", remainsPastDue: true });
-  await expect(page.getByText("✦ Smart").first()).toBeVisible();
+  // The badge lost its word when the row took Apple Reminders' shape: it renders
+  // the glyph alone and carries the meaning in `title`. Assert the marker AND its
+  // description, so this still proves a smart-origin reminder is labelled rather
+  // than just proving some star is on screen.
+  const smartBadge = page.locator(".smart-badge").first();
+  await expect(smartBadge).toBeVisible();
+  await expect(smartBadge).toHaveAttribute(
+    "title",
+    "Created from a reviewed Smart suggestion",
+  );
   await page.getByRole("button", { name: "Completed" }).click();
   await expect(page.getByText("Book the pilot review")).toHaveCount(0);
   await expect(page.getByText("Send the roadmap follow-up")).toHaveCount(0);
