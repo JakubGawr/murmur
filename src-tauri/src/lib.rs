@@ -414,6 +414,7 @@ pub fn run() {
             commands::update_reminder,
             commands::delete_reminder,
             commands::complete_reminder,
+            commands::reopen_reminder,
             commands::dismiss_reminder_occurrence,
             commands::audit_reminder_suggestions,
             commands::accept_reminder_suggestion,

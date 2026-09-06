@@ -1,0 +1,71 @@
+<header class="panel-head">
+  <h2>Reminders</h2>
+  <div class="panel-head-actions">
+    <button type="button" class="btn btn-primary" (click)="newReminder()">
+      New reminder
+    </button>
+    <button
+      type="button"
+      class="panel-close"
+      (click)="closed.emit()"
+      aria-label="Close reminders"
+      title="Close reminders"
+    >
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+        <path
+          d="m4 4 8 8M12 4l-8 8"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+        />
+      </svg>
+    </button>
+  </div>
+</header>
+
+@if (store.error(); as message) {
+  <div class="panel-error" role="alert">
+    <span>{{ message }}</span>
+    <button type="button" class="btn btn-ghost" (click)="store.refresh()">
+      Retry
+    </button>
+  </div>
+}
+
+<div class="panel-scroll">
+  <!-- The spinner is gated on `total() === 0 && loading()`, never on loading
+       alone: the store outlives this drawer, so a re-open must show its cached
+       rows immediately and refresh underneath rather than flashing empty. -->
+  @if (showSpinner()) {
+    <p class="panel-empty">Loading reminders…</p>
+  } @else if (total() === 0) {
+    <div class="panel-empty">
+      <p>No reminders on this note yet.</p>
+      <p class="panel-empty-hint">
+        Anything you create here stays attached to this note and shows up in
+        your Reminders inbox when it comes due.
+      </p>
+    </div>
+  } @else {
+    @for (group of groups(); track group.id) {
+      @if (group.rows.length > 0) {
+        <section class="panel-group" [attr.aria-label]="group.label">
+          <h3>
+            {{ group.label }}
+            <span class="count">{{ group.rows.length }}</span>
+          </h3>
+          <ul class="panel-list">
+            @for (row of group.rows; track row.key) {
+              <li>
+                <app-reminder-row
+                  [row]="row"
+                  [class.is-done]="group.id === 'completed'"
+                />
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
+  }
+</div>

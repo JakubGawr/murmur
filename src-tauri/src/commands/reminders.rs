@@ -2467,6 +2467,31 @@ pub fn complete_reminder(
     Ok(())
 }
 
+/// Reopen a completed reminder — the inverse of `complete_reminder`, for a checkbox the user
+/// ticked and wants back. Like completion it works by id alone and returns nothing, so it reads no
+/// source content and needs no visibility gate of its own; what it CAN do to a locked source's
+/// reminder is exactly what completing it already could.
+#[tauri::command]
+pub fn reopen_reminder(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    reminder_id: String,
+    expected_due_at: i64,
+) -> Result<(), AppError> {
+    let _lifecycle = super::lifecycle_guard(state.inner());
+    validate_opaque_id(&reminder_id, "reminder")?;
+    validate_due_at(expected_due_at)?;
+    let now = chrono::Utc::now().timestamp_millis();
+    // False is an idempotent replay or a stale UI generation, never a partial write.
+    let _ = state.db.reopen_reminder(&reminder_id, expected_due_at, now)?;
+    // The reopened reminder may already be overdue; give it its Inbox occurrence back in the same
+    // user action rather than at the next scheduler tick. `reopen_reminder` deleted the completed
+    // occurrence precisely so this call can decide, by the one rule that governs it.
+    state.db.materialize_due_reminders(now)?;
+    emit_reminder_count(&app, state.inner());
+    Ok(())
+}
+
 #[tauri::command]
 pub fn dismiss_reminder_occurrence(
     app: AppHandle,

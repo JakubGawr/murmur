@@ -378,9 +378,39 @@ export class ReminderComposerComponent {
     }
   }
 
+  /**
+   * Remember what opened the composer, so closing it can hand focus back.
+   *
+   * TWO things went wrong here, and only WebKit could show either. Safari does
+   * not focus a `<button>` on click (the macOS convention), so `activeElement`
+   * stays `<body>` in `hydrate` and this remembered target is the ONLY way focus
+   * can be restored. Chromium focuses the button and never reaches it.
+   *
+   * 1. The row's Edit control is a `<button>` wrapping `<mur-icon>`, so a click
+   *    lands on the icon's `<svg>` — and an `<svg>` is an `SVGElement`, NOT an
+   *    `HTMLElement`. The old `instanceof HTMLElement` guard therefore dropped
+   *    the event outright and nothing was remembered at all.
+   * 2. Even past that guard, the raw target is the glyph, and focusing a
+   *    non-focusable element silently does nothing.
+   *
+   * So: accept any `Element`, then walk up to the nearest focusable ancestor.
+   * Murmur ships in WKWebView, which means the broken path was the shipping one.
+   */
   rememberPointerTarget(event: MouseEvent): void {
-    if (!this.service.request() && event.target instanceof HTMLElement) {
-      this.lastPointerTarget = event.target;
+    if (this.service.request()) {
+      return;
+    }
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const focusable = target.closest<HTMLElement>(
+      "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
+    );
+    if (focusable) {
+      this.lastPointerTarget = focusable;
+    } else if (target instanceof HTMLElement) {
+      this.lastPointerTarget = target;
     }
   }
 

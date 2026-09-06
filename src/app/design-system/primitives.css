@@ -16,9 +16,15 @@
   height: 40px;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.05);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  /* Both of these were RAW values, and that is why a skin could not reach the
+     one primitive every button in the app is built from: a hardcoded white
+     wash and a hardcoded 12px frost survived `--glass-blur: 0`, so Paper's
+     buttons stayed frosted while everything around them went flat. The blur is
+     now a FRACTION of the glass token (30px x 0.4 = 12px — pixel-identical to
+     what shipped), so switching the material off switches this off with it. */
+  background: var(--btn-bg);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.4));
+  backdrop-filter: blur(calc(var(--glass-blur) * 0.4));
   color: var(--text-primary);
   font-family: inherit;
   font-size: 0.9375rem;
@@ -241,7 +247,7 @@ legend { padding: 0 var(--space-2); color: var(--text-secondary); font-size: 0.8
   white-space: nowrap;
 }
 .pill .pill-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
-.pill.is-accent { background: var(--accent-soft); border-color: transparent; color: var(--accent-hover); }
+.pill.is-accent { background: var(--accent-soft); border-color: transparent; color: var(--accent-text); }
 .pill.is-success { background: var(--success-soft); border-color: transparent; color: var(--success); }
 .pill.is-danger { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
 .pill.is-warning { background: var(--warning-soft); border-color: transparent; color: var(--warning); }
@@ -376,7 +382,7 @@ legend { padding: 0 var(--space-2); color: var(--text-secondary); font-size: 0.8
   transition: background var(--transition), color var(--transition);
 }
 .seg-btn:hover:not(.is-active):not(:disabled) { background: var(--surface-hover); color: var(--text-primary); }
-.seg-btn.is-active { background: var(--accent-soft); color: var(--accent-hover); }
+.seg-btn.is-active { background: var(--accent-soft); color: var(--accent-text); }
 .seg-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-ring); }
 .seg-btn:disabled { cursor: not-allowed; opacity: 0.5; }
 

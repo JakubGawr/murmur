@@ -4,6 +4,50 @@
   --font-sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, system-ui,
     sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  /* The DOCUMENT face — the long-form note/transcript body, as distinct from
+     UI chrome. Defaults to the UI face, so the base skin renders exactly as it
+     always has; a skin (see skin-paper.css) can give reading its own face
+     without touching a single component. Consumer: `.note-doc`. */
+  --font-reading: var(--font-sans);
+
+  /* --- Body metrics, as tokens so a skin can retune reading comfort --------
+     Hanken Grotesk is a geometric grotesque and wants the negative tracking
+     below to look settled; a system face does not, which is the whole reason
+     these are tokens rather than literals in the `body` / `h1..h4` rules.
+     `--leading-body` stays at or above the 1.5 that WCAG 1.4.8 asks of blocks
+     of text. Values here are the SHIPPED ones — changing them changes the
+     default skin. */
+  --tracking-body: -0.012em;
+  --tracking-heading: -0.025em;
+  --leading-body: 1.55;
+
+  /* --- The note document's two type surfaces -----------------------------
+     Rendered markdown (`.md-body`, the shared app-markdown renderer) and the
+     plain-text WRITING surface (the editor's textarea plus the hidden mirror
+     that sizes it) shipped DIFFERENT metrics — 15px/1.66 reading against
+     16px/1.7 writing — so the same note reflowed slightly every time you
+     toggled between them. Both are tokens now, defaulting to exactly those
+     shipped values, so nothing moves until a skin says otherwise.
+
+     `--leading-body` above does NOT reach either surface: both declare their
+     own line-height, which is the whole reason a skin could restyle the app's
+     chrome and leave the prose untouched. */
+  --prose-size: 15px;
+  --prose-leading: 1.66;
+
+  /* The note DOCUMENT's type — ONE pair, deliberately, read by BOTH of its
+     surfaces. Two values that merely happen to agree can drift apart again on
+     any future edit; one value cannot, so the reflow jump is now impossible by
+     construction rather than by coincidence. `1rem` (16px) is the writing
+     surface's shipped size, and reading is raised to meet it — the direction
+     that makes a document more comfortable rather than less.
+
+     This is NOT `--prose-*` above: that pair belongs to the shared markdown
+     renderer, which also draws Ask answers, chat bubbles, panel previews, the
+     weekly digest and quick-search results. Those keep 15px/1.66. `.note-doc`
+     re-points `--prose-*` at this pair for its own subtree. */
+  --note-size: 1rem;
+  --note-leading: 1.7;
 
   /* Compact command/picker hierarchy shared by dense workspace chrome. */
   --type-command-label: 0.84rem;

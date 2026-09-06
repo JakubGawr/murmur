@@ -1,4 +1,67 @@
 <div class="section-stack">
+          <!-- Theme SKIN — the broadest choice on this screen, so it leads:
+               it decides what the app is made of, while Appearance below only
+               decides how bright it is. Applies live; the whole window is the
+               preview, so the tiles only have to carry the identity. -->
+          <div class="card appearance-card">
+            <div class="appearance-copy">
+              <h3>Theme</h3>
+              <p class="text-secondary">
+                How Murmur is built — its surfaces, shapes and type. Each theme
+                works in both Light and Dark.
+              </p>
+            </div>
+            <div class="theme-row" role="radiogroup" aria-label="Theme">
+              @for (opt of skinOptions; track opt.id) {
+                <button
+                  type="button"
+                  class="theme-tile"
+                  [class.is-active]="skin() === opt.id"
+                  role="radio"
+                  [attr.aria-checked]="skin() === opt.id"
+                  (click)="setSkin(opt.id)"
+                >
+                  <span
+                    class="theme-preview"
+                    [class]="'theme-preview preview-' + opt.id"
+                    aria-hidden="true"
+                  >
+                    <span class="tp-rail"></span>
+                    <span class="tp-page">
+                      <span class="tp-sample">Aa</span>
+                      <span class="tp-line"></span>
+                      <span class="tp-line is-short"></span>
+                    </span>
+                  </span>
+                  <span class="theme-meta">
+                    <span class="theme-name">
+                      {{ opt.name }}
+                      @if (skin() === opt.id) {
+                        <svg
+                          class="theme-check"
+                          viewBox="0 0 16 16"
+                          width="13"
+                          height="13"
+                          fill="none"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="m3.5 8.5 3 3 6-6.5"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          />
+                        </svg>
+                      }
+                    </span>
+                    <span class="theme-desc">{{ opt.description }}</span>
+                  </span>
+                </button>
+              }
+            </div>
+          </div>
+
           <div class="card appearance-card">
             <div class="appearance-copy">
               <h3>Appearance</h3>
@@ -11,7 +74,7 @@
               [options]="themeOptions"
               [value]="themeMode()"
               (valueChange)="setTheme($any($event))"
-              ariaLabel="Theme"
+              ariaLabel="Appearance"
             />
           </div>
 
@@ -58,7 +121,11 @@
           </div>
 
           <!-- Liquid Glass intensity — how translucent the chrome panels
-               (sidebar / pill bar / rails) are. Applies live, auto-saved. -->
+               (sidebar / pill bar / rails) are. Applies live, auto-saved.
+               STUDIO ONLY: Paper turns the material off (--glass-blur: 0 and
+               an opaque veil), so this slider would have nothing left to fade.
+               A control that visibly does nothing is worse than an absent one. -->
+          @if (skin() === "studio") {
           <div class="card appearance-card">
             <div class="appearance-copy">
               <h3>Liquid Glass</h3>
@@ -87,5 +154,6 @@
               <span class="glass-value">{{ glassLevel() }}%</span>
             </div>
           </div>
+          }
 </div>
   

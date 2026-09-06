@@ -66,23 +66,36 @@ test("idle surface keeps its affordance but drops the branded card", async ({
   await page.goto("/notes/n-atlas-prd");
 
   const card = page.locator("app-smart-reminder-card");
-  await expect(card.getByRole("button", { name: "New reminder" })).toBeVisible();
+  // The affordance MOVED rather than disappeared: 701be0fc replaced the card's
+  // inline create button with the note's Reminders drawer, and both mounts of the
+  // card now pass `[showCreateAction]="false"`. With nothing to review, nothing to
+  // create from and no error, the card's whole template is gated out — so an idle
+  // surface renders no card chrome at all, and the affordance is the header toggle.
+  await expect(
+    page.getByRole("button", { name: "Reminders", exact: true }),
+  ).toBeVisible();
   // The kicker and the imperative heading are gone when there is nothing to
   // review. NOT asserted by its literal text: the template ships a CURLY
   // apostrophe (U+2019) in "Don’t", so a straight-quote assertion would match
   // zero nodes on unchanged code and be vacuously green forever.
   await expect(card.locator(".smart-kicker")).toHaveCount(0);
-  await expect(card.locator("section.smart-card.is-strip")).toHaveCount(1);
+  await expect(card.locator("section.smart-card")).toHaveCount(0);
 });
 
 test("composer opens with a resolved due readback and preset chips", async ({
   page,
 }) => {
-  await mockTauri(page, {}, { get_note: LONG_NOTE, audit_reminder_suggestions: [] });
+  await mockTauri(page, {}, {
+    get_note: LONG_NOTE,
+    audit_reminder_suggestions: [],
+    list_reminders: { inbox: [], upcoming: [], completed: [], dueInboxCount: 0 },
+  });
   await page.goto("/notes/n-atlas-prd");
 
+  // Through the drawer: the card's create button is gone (see the test above).
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
   await page
-    .locator("app-smart-reminder-card")
+    .locator("app-note-reminders-panel")
     .getByRole("button", { name: "New reminder" })
     .click();
 
@@ -101,10 +114,15 @@ test("composer opens with a resolved due readback and preset chips", async ({
 });
 
 test("date and time fields are boxed like every other field", async ({ page }) => {
-  await mockTauri(page, {}, { get_note: LONG_NOTE, audit_reminder_suggestions: [] });
+  await mockTauri(page, {}, {
+    get_note: LONG_NOTE,
+    audit_reminder_suggestions: [],
+    list_reminders: { inbox: [], upcoming: [], completed: [], dueInboxCount: 0 },
+  });
   await page.goto("/notes/n-atlas-prd");
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
   await page
-    .locator("app-smart-reminder-card")
+    .locator("app-note-reminders-panel")
     .getByRole("button", { name: "New reminder" })
     .click();
 

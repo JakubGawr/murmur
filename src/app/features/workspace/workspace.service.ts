@@ -9,7 +9,12 @@ import {
 
 import { AskHistoryPrivacyBarrierService } from "../../core/ask-history-privacy-barrier.service";
 import { IpcService } from "../../core/ipc.service";
-import type { ContainerNode, ItemKind, ItemPage } from "../../core/models";
+import type {
+  ContainerNode,
+  ItemKind,
+  ItemPage,
+  ItemRow,
+} from "../../core/models";
 import type { DraggableKind } from "../folders/note-drag.service";
 
 /** Storage key for persisted container expansion. */
@@ -130,6 +135,59 @@ export class WorkspaceService {
       this.ensureLoadedInFlight = null;
     });
     return this.ensureLoadedInFlight;
+  }
+
+  /**
+   * Patch one cached item's title in the forest, with no round-trip.
+   *
+   * The sidebar's rows come from THIS forest, not from `NotesService`, so a
+   * rename in the editor left them stale: the tab strip re-synced on every
+   * keystroke and the tree did not, because nothing told it. A reload would
+   * have worked and been wrong — a full container read on every keystroke, to
+   * change one string the caller already has.
+   *
+   * Returns the SAME node/group/item objects wherever nothing changed, so an
+   * unrelated rename cannot invalidate the whole tree: only the branch that
+   * actually contains the item gets new references, and every OnPush row on
+   * another branch keeps its identity.
+   */
+  applyItemTitle(kind: ItemKind, id: string, title: string | null): void {
+    const patchItems = (items: ItemRow[]): ItemRow[] => {
+      let changed = false;
+      const next = items.map((item) => {
+        if (item.kind !== kind || item.id !== id || item.title === title) {
+          return item;
+        }
+        changed = true;
+        return { ...item, title };
+      });
+      return changed ? next : items;
+    };
+    const patchNodes = (nodes: ContainerNode[]): ContainerNode[] => {
+      let changed = false;
+      const next = nodes.map((node) => {
+        let nodeChanged = false;
+        const groups = node.groups.map((group) => {
+          const items = patchItems(group.items);
+          if (items === group.items) {
+            return group;
+          }
+          nodeChanged = true;
+          return { ...group, items };
+        });
+        const folders = patchNodes(node.folders);
+        if (folders !== node.folders) {
+          nodeChanged = true;
+        }
+        if (!nodeChanged) {
+          return node;
+        }
+        changed = true;
+        return { ...node, groups, folders };
+      });
+      return changed ? next : nodes;
+    };
+    this._forest.update((forest) => patchNodes(forest));
   }
 
   /** Reload the whole forest. Safe to call repeatedly; the last write wins. */

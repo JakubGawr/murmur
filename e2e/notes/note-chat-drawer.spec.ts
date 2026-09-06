@@ -72,6 +72,15 @@ test("Ask Brain header toggle opens/closes the right drawer with note-chat insid
       bodyRight: Math.round(b.right),
       mainRight: Math.round(main.right),
       viewportH: window.innerHeight,
+      // The shell FLOATS inside the window: `.app-shell` pays `--shell-gutter`
+      // on every side (styles.css) and its column is `100vh - 2 * gutter`. So
+      // the bottom a pane can actually reach is the SHELL's, not the window's.
+      // Read it rather than hardcoding 8px — the Paper skin sets it to 0.
+      shellGutter: Math.round(
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue("--shell-gutter"),
+        ) || 0,
+      ),
     };
   });
   // Adjacent, not overlapping — the drawer begins exactly where the body ends (± a rounding px).
@@ -83,10 +92,18 @@ test("Ask Brain header toggle opens/closes the right drawer with note-chat insid
   expect(Math.abs(layout.drawerRight - layout.mainRight)).toBeLessThanOrEqual(1);
   // On-screen (not below the fold): its top is within the viewport.
   expect(layout.drawerTop).toBeLessThan(layout.viewportH);
-  // REACHES THE BOTTOM (2026-07-19, user request): the pane runs to the very bottom of the window
+  // REACHES THE BOTTOM (2026-07-19, user request): the pane runs to the very bottom
   // — not cut off ~64px short by app-main's bottom padding. Guards a regression of the negative
   // `margin-bottom` / no-`space-8` host height that makes the split flush to the bottom edge.
-  expect(Math.abs(layout.drawerBottom - layout.viewportH)).toBeLessThanOrEqual(4);
+  //
+  // MEASURED AGAINST THE SHELL, NOT THE WINDOW (2026-09-06). The shell gained a
+  // `--shell-gutter` inset after this line was written, so a pane inside it can no
+  // longer touch the window's edge — it was 8px short, which is the gutter, exactly.
+  // This is a corrected REFERENCE POINT, not a loosened tolerance: the ±4px stays,
+  // and the 64px cut-off this line exists to catch still fails it. `--shell-gutter`
+  // is read live, so the Paper skin (gutter 0) still asserts against the window.
+  const shellBottom = layout.viewportH - layout.shellGutter;
+  expect(Math.abs(layout.drawerBottom - shellBottom)).toBeLessThanOrEqual(4);
 
   // SPLIT VIEW: the two panes start at the SAME top (the drawer is a full-height COLUMN, not a bar
   // hanging under the header), so the note header's top aligns with the drawer pane's top. And the
@@ -106,8 +123,18 @@ test("Ask Brain header toggle opens/closes the right drawer with note-chat insid
       chatHeadBottom: Math.round(chatHead.bottom),
     };
   });
-  // Both panes begin at the same Y (the drawer isn't offset below the header).
-  expect(Math.abs(dock.drawerTop - dock.headTop)).toBeLessThanOrEqual(2);
+  // The drawer's BOX now starts at or ABOVE the note header — 2026-09-06, user
+  // request: the tool column must reach the top of the window instead of
+  // leaving a strip of page colour above it, so it bleeds up over the tab
+  // strip's band and pays the distance back as padding.
+  //
+  // This assertion used to read `|drawerTop - headTop| <= 2`, and the change is
+  // deliberate rather than a weakening: the bug it was written for was a drawer
+  // offset BELOW the header, and that is still caught — more tightly, since the
+  // top may no longer merely be close, it must not be lower at all. What the
+  // padding preserves, and the next assertion still pins, is the thing the old
+  // one was really protecting: the two header bands sharing one divider line.
+  expect(dock.drawerTop).toBeLessThanOrEqual(dock.headTop);
   // The two header bands share one horizontal divider line (± a few px for sub-pixel rounding).
   expect(Math.abs(dock.chatHeadBottom - dock.headBottom)).toBeLessThanOrEqual(3);
 

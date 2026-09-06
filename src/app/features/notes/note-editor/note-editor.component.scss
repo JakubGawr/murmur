@@ -25,8 +25,22 @@
      height gains back exactly what the margin removes, so the bottom edge — and the Ask
      Brain column reaching it — is unchanged. */
   margin-top: calc(var(--space-2) - var(--space-7));
-  height: calc(100vh - 10px - var(--tabs-strip-height, 0px) - var(--space-2));
+  height: calc(
+    100vh - var(--shell-vertical-inset) - var(--tabs-strip-height, 0px) -
+      var(--space-2)
+  );
   margin-bottom: calc(-1 * var(--space-8));
+  /* FULL-BLEED HORIZONTALLY (2026-09-06, user request: "the drawer should go all
+     the way right, with no empty space"). `.app-main` pays `--space-5` left and
+     right on every route — right for a page of centred content, wrong for this
+     one, whose right edge is a TOOL COLUMN. Left unpaid it stranded the drawer
+     24px short of the content column, and the shell's own gutter put another 8px
+     after that. The document stays CENTRED rather than sliding: `.note-doc` has
+     its own `max-width` + `margin: 0 auto`, so widening the box it centres in
+     moves it by half the difference — measured at 6px, not a jump. Cancelled in
+     embedded mode below, like the vertical bleed. */
+  margin-left: calc(-1 * var(--space-5));
+  margin-right: calc(-1 * var(--space-5));
   min-height: 0;
 }
 
@@ -54,6 +68,8 @@
      into the recording chrome above it. */
   margin-top: 0;
   margin-bottom: 0;
+  margin-left: 0;
+  margin-right: 0;
 }
 .editor.is-embedded {
   height: 100%;
@@ -210,6 +226,21 @@
 .head-btn.is-shared {
   color: var(--accent-hover);
 }
+/* Icon-only header toggle (Reminders). `.btn` pads for a text label, so square
+   it and centre the glyph — the same correction `.head-seg .seg-btn-icon` makes
+   above, kept at `.head-btn`'s 32px so the header row stays one height. Active
+   (drawer-open) reads as a pressed neutral pill with an accent glyph, matching
+   `.head-chat-btn.is-active` rather than inventing a second active language. */
+.head-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  padding: 0;
+}
+.head-icon-btn.is-active {
+  background: var(--surface-hover);
+  color: var(--accent-text);
+}
 /* Ask Brain toggle: the glyph adopts the accent, and the active (drawer-open)
    state reads as a pressed neutral pill with the accent glyph/label. */
 .head-chat-btn {
@@ -354,25 +385,79 @@
    A full-height second COLUMN beside the note — not a floating overlay, not a bar hanging off the
    header. It carries its OWN header band (the chat's `.chat-head`, aligned with the note header)
    and is separated from the note pane by ONE continuous hairline that runs top-to-bottom. */
-.note-chat-drawer {
+.note-chat-drawer,
+.note-tool-drawer {
   /* Full-height pane (2026-07-19 redesign): `.editor-main` is a stretch flex ROW spanning the whole
      editor, so this pane runs from the very top to the very bottom — its header band lines up with
      the note header, and the divider below is one unbroken vertical line (fixing the old "welded at
      the top, cut at the bottom" look). `.editor-body` owns the note scroll, the chat owns its own,
      so both panes stay put relative to each other. */
   flex: none;
-  width: clamp(320px, 30vw, 400px);
+  width: var(--note-drawer-w);
   display: flex;
+  /* REACH THE TOP (2026-09-06, user request: "the sidebar should go all the way
+     up"). The editor starts below the tab strip, so the pane's SURFACE stopped
+     there too and left a strip of page colour above it. The box now bleeds up
+     over the strip's band and pays the same distance back as padding, so the
+     pane is full-height while its header stays exactly where it was — which
+     matters: e2e/notes/note-chat-drawer.spec.ts pins the chat pane's header
+     against the note header's, and moving the content would break an alignment
+     someone deliberately established. `--tabs-strip-height` is 0px when no tab
+     is open (AppShellComponent sets it live on <html>), so this collapses to
+     the 8px standoff on its own.
+
+     Only the BOX bleeds here. What each pane does with the reclaimed band is
+     its own call, below: the chat pays it back as padding, the tool pane
+     spends it. */
+  margin-top: calc(-1 * (var(--tabs-strip-height, 0px) + var(--space-2)));
+  /* ABOVE THE WINDOW-DRAG STRIP (2026-09-06, user report: "the New reminder
+     button doesn't take a click on its whole surface").
+     `.shell-drag` is `position: fixed`, full width, 32px tall, `z-index: 8` —
+     the band you drag the window by. Bleeding this pane up to the window's top
+     put its header INSIDE that band, so the top 12px of a 30px button was
+     hit-tested to the drag strip: visible, and dead to a click. Exactly the
+     failure `e2e/settings/settings-modal.spec.ts` was written about, where a
+     `toBeVisible()` assertion passed while thirty specs timed out clicking.
+     The sidebar solved this long ago by sitting at `z-index: 9`; this pane is
+     the same kind of chrome and takes the same rank.
+
+     The trade-off, stated: the window can no longer be dragged by the strip of
+     title bar this pane covers. Everywhere else along the top still drags, and
+     a band that now holds three controls is the wrong place to grab a window
+     anyway. */
+  position: relative;
+  z-index: 9;
   flex-direction: column;
   min-height: 0;
-  /* ONE continuous hairline divider, full height (it crosses the header band too, so the two panes
-     read as a single split, not a floating box). Same token as the header dividers ⇒ the vertical
-     and horizontal seams match. */
-  border-left: 1px solid var(--border);
-  /* A subtle raised pane tone so the "tool" column reads as distinct from the document without the
-     heavy opaque-modal look — it's in-flow chrome now (not a floating overlay), so T3 doesn't apply
-     and the frosted-raised surface is the right register. */
-  background: var(--surface-raised);
+  /* THE SHELL'S OWN PANEL FRAME (2026-09-06, user request: "the right pane still
+     doesn't have the rounding and style the left one has"). This used to be a
+     hairline-plus-raised-tone split of the content pane — a deliberate choice
+     while the shell was the only thing that floated, and the wrong one once the
+     sidebar sat beside it in Studio looking like a different species of object.
+
+     Reading the same `--shell-panel-*` tokens the sidebar reads settles BOTH of
+     the requests that pulled in opposite directions: Studio floats this pane
+     with the sidebar's radius, glass and shadow, while Paper — which zeroes
+     those tokens — keeps it flat and glued to the window, separated by the one
+     hairline that skin allows itself. One frame, two answers, no branch. */
+  background:
+    linear-gradient(var(--shell-glass-veil), var(--shell-glass-veil)),
+    var(--shell-glass-bg);
+  -webkit-backdrop-filter: blur(var(--shell-glass-blur)) saturate(var(--shell-glass-saturate));
+  backdrop-filter: blur(var(--shell-glass-blur)) saturate(var(--shell-glass-saturate));
+  border: var(--shell-panel-border);
+  border-left: var(--shell-panel-border-left);
+  border-radius: var(--shell-panel-radius);
+  /* No per-corner softening here, deliberately. `.app-sidebar` carries a rule
+     that means to soften its window-facing corners toward the OS mask, but that
+     rule is DEAD: `.app-sidebar.primary-sidebar` sets the `border-radius`
+     SHORTHAND later and at higher specificity, so the sidebar actually renders
+     24px on all four. Mirroring the intent here would have made this pane the
+     only thing in the window with 13px corners — matching a rule nobody sees
+     instead of the panel it is supposed to match. (The dead rule is worth its
+     own change; it is not this one.) */
+  box-shadow: var(--shell-panel-shadow), var(--shell-glass-inner);
+  overflow: hidden;
   animation: note-chat-drawer-in var(--transition);
 }
 @keyframes note-chat-drawer-in {
@@ -385,6 +470,21 @@
     transform: translateX(0);
   }
 }
+/* Ask Brain PAYS THE BAND BACK. Its header shares one divider line with the
+   note's own header — a deliberate alignment, pinned by
+   e2e/notes/note-chat-drawer.spec.ts — so its content stays exactly where it
+   was even though its surface now reaches the window's top.
+
+   The tool pane does the opposite and SPENDS the band (2026-09-06, user
+   request: "look how much free space there is"). It answers to no such
+   alignment — it is its own surface with its own header — so its content
+   starts at the pane's top edge and the reclaimed strip becomes list rather
+   than padding. This is the one place the two panes differ; if the chat should
+   follow, it is this rule and that spec's header assertion, together. */
+.note-chat-drawer {
+  padding-top: calc(var(--tabs-strip-height, 0px) + var(--space-2));
+}
+
 /* The chat FILLS the whole drawer as ONE flat surface (bare mode = no card frame); its internal
    message log owns the scroll, so the composer pins to the bottom with no empty strip below. */
 .note-chat-drawer .note-chat {
@@ -447,6 +547,19 @@
 .note-doc {
   max-width: var(--editor-max);
   margin: 0 auto;
+  /* The DOCUMENT face. Defaults to --font-sans (see typography.css), so this is
+     a no-op for the base skin; Paper points it at the system serif. Scoped to
+     the document body on purpose — the editor's own chrome (toolbars, the
+     properties rail, code blocks) keeps the UI face. */
+  font-family: var(--font-reading);
+  /* Reading follows WRITING inside the document: the rendered markdown picks up
+     the same pair the textarea uses, so a paragraph breaks at the same words in
+     both modes and the text no longer shifts when you toggle. Custom properties
+     inherit across component boundaries, so this reaches `.md-body` inside the
+     child renderer without `::ng-deep` — and only inside this subtree, which is
+     why Ask, chat and the panels keep the shared --prose-* metrics. */
+  --prose-size: var(--note-size);
+  --prose-leading: var(--note-leading);
   transition: max-width var(--transition);
 }
 .note-doc.is-full-width {
@@ -709,8 +822,11 @@
   min-height: 60vh;
   box-sizing: border-box;
   font: inherit;
-  font-size: 1rem;
-  line-height: 1.7;
+  /* The textarea and its hidden `::after` mirror MUST stay typographically
+     identical or the auto-grow measurement drifts — that is why they share one
+     rule, and why these are one pair of tokens rather than two. */
+  font-size: var(--note-size);
+  line-height: var(--note-leading);
   padding: 0;
   border: 0;
   margin: 0;
@@ -784,7 +900,8 @@
   .note-doc {
     transition: none;
   }
-  .note-chat-drawer {
+  .note-chat-drawer,
+  .note-tool-drawer {
     animation: none;
   }
 }

@@ -12,7 +12,9 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface-raised);
-  backdrop-filter: blur(18px) saturate(140%);
+  /* 30px x 0.6 = 18px, unchanged — expressed against the token so Paper's
+     glass-off actually reaches the board cards. */
+  backdrop-filter: blur(calc(var(--glass-blur) * 0.6)) saturate(140%);
   overflow: hidden;
   transition:
     transform var(--transition),

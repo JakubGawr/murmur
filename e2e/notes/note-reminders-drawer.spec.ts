@@ -1,0 +1,349 @@
+import { test, expect } from "@playwright/test";
+import { mockNotes } from "./mock-invoke";
+
+/**
+ * The note's Reminders drawer: a header toggle beside Edit/Preview opens a
+ * right-side pane that creates reminders anchored to THIS note and lists the
+ * ones already attached to it.
+ *
+ * The assertion that carries the feature is the FILTER. `list_reminders` has no
+ * per-source form — it returns the whole snapshot — so the panel selects rows by
+ * their `sources` anchor. A filter that silently degrades to "show everything"
+ * would still look correct on a one-reminder fixture, so the fixture below
+ * deliberately contains reminders for ANOTHER note and for a meeting, and the
+ * spec asserts those are absent by name. Without those negatives the test would
+ * pass against a no-op filter.
+ */
+
+/** Two of these four must never reach a drawer opened on note `n1`. */
+const REMINDERS_FIXTURE = {
+  inbox: [],
+  upcoming: [
+    {
+      id: "r-mine",
+      title: "Follow up on the migration plan",
+      details: null,
+      dueAt: 1893499200000,
+      repeatEvery: null,
+      repeatUnit: null,
+      state: "active",
+      origin: "manual",
+      createdAt: 1893400000000,
+      updatedAt: 1893400000000,
+      completedAt: null,
+      sources: [{ kind: "note", id: "n1", title: "My First Note" }],
+    },
+    {
+      id: "r-other-note",
+      title: "Belongs to a different note",
+      details: null,
+      dueAt: 1893499200000,
+      repeatEvery: null,
+      repeatUnit: null,
+      state: "active",
+      origin: "manual",
+      createdAt: 1893400000000,
+      updatedAt: 1893400000000,
+      completedAt: null,
+      sources: [{ kind: "note", id: "n2", title: "Another Note" }],
+    },
+  ],
+  completed: [
+    {
+      id: "r-mine-done",
+      title: "Already handled on this note",
+      details: null,
+      dueAt: 1893499200000,
+      repeatEvery: null,
+      repeatUnit: null,
+      state: "completed",
+      origin: "manual",
+      createdAt: 1893400000000,
+      updatedAt: 1893400000000,
+      completedAt: 1893450000000,
+      sources: [{ kind: "note", id: "n1", title: "My First Note" }],
+    },
+    {
+      id: "r-meeting",
+      title: "Belongs to a meeting",
+      details: null,
+      dueAt: 1893499200000,
+      repeatEvery: null,
+      repeatUnit: null,
+      state: "completed",
+      origin: "manual",
+      createdAt: 1893400000000,
+      updatedAt: 1893400000000,
+      completedAt: 1893450000000,
+      sources: [{ kind: "meeting", id: "m1", title: "A Meeting" }],
+    },
+  ],
+  dueInboxCount: 0,
+};
+
+test("the note's Reminders drawer lists ONLY reminders anchored to this note", async ({
+  page,
+}) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.type() === "error") consoleErrors.push(msg.text());
+  });
+  page.on("pageerror", (err) => consoleErrors.push(String(err)));
+
+  await mockNotes(page, {}, [], { list_reminders: REMINDERS_FIXTURE });
+  await page.goto("/notes/n1");
+  await expect(page.locator(".note-title-input")).toHaveValue("My First Note");
+
+  // Default COLLAPSED: the toggle exists, the drawer does not.
+  const toggle = page.getByRole("button", { name: "Reminders", exact: true });
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("app-note-reminders-panel")).toHaveCount(0);
+
+  await toggle.click();
+  const panel = page.locator("app-note-reminders-panel");
+  await expect(panel).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+  // The filter. The positive AND both negatives — see the file header.
+  await expect(
+    panel.getByText("Follow up on the migration plan"),
+  ).toBeVisible();
+  await expect(panel.getByText("Already handled on this note")).toBeVisible();
+  await expect(panel.getByText("Belongs to a different note")).toHaveCount(0);
+  await expect(panel.getByText("Belongs to a meeting")).toHaveCount(0);
+  // `.panel-row` died with the "one row component" refactor: the panel now renders
+  // <app-reminder-row>, whose own markup is row-check / row-body / row-title.
+  await expect(panel.locator("app-reminder-row")).toHaveCount(2);
+
+  expect(consoleErrors).toEqual([]);
+});
+
+test("the row's circle carries completion state and toggles BOTH ways", async ({
+  page,
+}) => {
+  await mockNotes(page, {}, [], { list_reminders: REMINDERS_FIXTURE });
+  await page.goto("/notes/n1");
+  await expect(page.locator(".note-title-input")).toHaveValue("My First Note");
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
+
+  const open = page.getByRole("checkbox", {
+    name: "Complete Follow up on the migration plan",
+  });
+  await expect(open).toHaveAttribute("aria-checked", "false");
+  await expect(open).toBeEnabled();
+
+  // A finished one is still a live control: ticking something off by mistake has
+  // to be undoable, which is what `reopen_reminder` exists for. Its label says
+  // what a click WILL do, not what the row currently is.
+  const done = page.getByRole("checkbox", {
+    name: "Mark Already handled on this note as not done",
+  });
+  await expect(done).toHaveAttribute("aria-checked", "true");
+  await expect(done).toBeEnabled();
+
+  // And it calls the reopen command, not complete — the direction is read from
+  // the reminder's own state, so a row rendered in the wrong group cannot send
+  // the wrong action.
+  const calls: string[] = [];
+  await page.exposeFunction("__recordReminderCall", (cmd: string) => {
+    calls.push(cmd);
+  });
+  await page.evaluate(() => {
+    const internals = (window as any).__TAURI_INTERNALS__;
+    const real = internals.invoke.bind(internals);
+    internals.invoke = (cmd: string, args: unknown) => {
+      if (cmd === "reopen_reminder" || cmd === "complete_reminder") {
+        (window as any).__recordReminderCall(cmd);
+      }
+      return real(cmd, args);
+    };
+  });
+  await done.click();
+  await expect.poll(() => calls).toEqual(["reopen_reminder"]);
+
+  // The strikethrough is the sighted half of that same state.
+  const struck = await page
+    .locator("app-reminder-row.is-done .row-title span")
+    .first()
+    .evaluate((el) => getComputedStyle(el).textDecorationLine);
+  expect(struck).toContain("line-through");
+});
+
+test("the drawer and Ask Brain are mutually exclusive, and the drawer persists", async ({
+  page,
+}) => {
+  await mockNotes(page, {}, [], { list_reminders: REMINDERS_FIXTURE });
+  await page.goto("/notes/n1");
+  await expect(page.locator(".note-title-input")).toHaveValue("My First Note");
+
+  const reminders = page.getByRole("button", { name: "Reminders", exact: true });
+  const askBrain = page
+    .getByRole("button", { name: "Ask Brain" })
+    .and(page.locator(".head-chat-btn"));
+
+  await reminders.click();
+  await expect(page.locator("app-note-reminders-panel")).toBeVisible();
+
+  // ONE tool column at a time: two ~360px panes would leave the document a
+  // sliver on a normal window.
+  await askBrain.click();
+  await expect(page.locator("app-note-chat")).toBeVisible();
+  await expect(page.locator("app-note-reminders-panel")).toHaveCount(0);
+  await expect(reminders).toHaveAttribute("aria-expanded", "false");
+
+  await reminders.click();
+  await expect(page.locator("app-note-reminders-panel")).toBeVisible();
+  await expect(page.locator("app-note-chat")).toHaveCount(0);
+
+  // Persisted, like the chat drawer's own state.
+  await page.reload();
+  await expect(page.locator("app-note-reminders-panel")).toBeVisible();
+});
+
+test("the drawer reaches the top and the tab strip keeps its width clear", async ({
+  page,
+}) => {
+  await mockNotes(page, {}, [], { list_reminders: REMINDERS_FIXTURE });
+  // This test MEASURES the tab strip, and `.tab-strip` only exists while a tab is
+  // open (`@if (tabs().length > 0)` in tab-strip.component.html). A `goto`
+  // deep-link deliberately opens NO tab, so going straight to /notes/n1 left
+  // `document.querySelector(".tab-strip")` null and the measurement threw before
+  // it could assert anything. Open the note the way a user does — the same
+  // pattern tab-strip-drilldown-clearance.spec.ts uses.
+  await page.goto("/notes");
+  await page.getByRole("button", { name: "My First Note" }).click();
+  await expect(page.locator(".tab-strip .tab-item")).toHaveCount(1);
+  await expect(page.locator(".note-title-input")).toHaveValue("My First Note");
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
+  await expect(page.locator("app-note-reminders-panel")).toBeVisible();
+  // The pane slides in horizontally; measure at rest or the numbers are mid-animation.
+  await page.waitForTimeout(500);
+
+  const layout = await page.evaluate(() => {
+    const drawer = document.querySelector(".note-tool-drawer")!.getBoundingClientRect();
+    const strip = document.querySelector(".tab-strip")!;
+    const stripBox = strip.getBoundingClientRect();
+    return {
+      drawerTop: Math.round(drawer.top),
+      panelHeadTop: Math.round(
+        document.querySelector(".note-tool-drawer .panel-head")!.getBoundingClientRect().top,
+      ),
+      drawerRight: Math.round(drawer.right),
+      drawerBottom: Math.round(drawer.bottom),
+      stripTop: Math.round(stripBox.top),
+      stripContentRight: Math.round(stripBox.right - parseFloat(getComputedStyle(strip).paddingRight)),
+      drawerLeft: Math.round(drawer.left),
+      viewportW: window.innerWidth,
+      viewportH: window.innerHeight,
+      sidebar: (() => {
+        const b = document.querySelector(".primary-sidebar")!.getBoundingClientRect();
+        return { left: Math.round(b.left), top: Math.round(b.top), bottom: Math.round(b.bottom) };
+      })(),
+    };
+  });
+
+  // No strip of page colour above the pane: it starts at or above the tab strip.
+  expect(layout.drawerTop).toBeLessThanOrEqual(layout.stripTop);
+
+  // And the pane SPENDS that reclaimed band rather than padding it away: its
+  // header sits on the pane's own top edge. (Ask Brain deliberately does the
+  // opposite — it repays the band to keep its header on the note header's
+  // divider line — so this assertion is about the tool pane specifically.)
+  expect(layout.panelHeadTop - layout.drawerTop).toBeLessThanOrEqual(1);
+
+  // ...and because it bleeds over that band and is opaque, the strip must keep
+  // the pane's width clear, or a tab scrolled to the end sits underneath it —
+  // visible to a `toBeVisible()` assertion and dead to a click, the failure mode
+  // e2e/settings/settings-modal.spec.ts exists to describe elsewhere.
+  expect(layout.stripContentRight).toBeLessThanOrEqual(layout.drawerLeft);
+
+  // The two chrome panels are ONE kind of object: the tool pane's top, bottom
+  // and outer gutter mirror the sidebar's. Stated against the sidebar rather
+  // than against the viewport on purpose — it is the invariant in both skins,
+  // where Studio insets both by a gutter and Paper glues both to the window,
+  // and a viewport-flush assertion would only have been true for one of them.
+  expect(Math.abs(layout.drawerTop - layout.sidebar.top)).toBeLessThanOrEqual(2);
+  expect(Math.abs(layout.drawerBottom - layout.sidebar.bottom)).toBeLessThanOrEqual(2);
+  expect(
+    Math.abs(layout.viewportW - layout.drawerRight - layout.sidebar.left),
+  ).toBeLessThanOrEqual(2);
+});
+
+test("the pane's header controls take a click across their whole surface", async ({
+  page,
+}) => {
+  await mockNotes(page, {}, [], { list_reminders: REMINDERS_FIXTURE });
+  await page.goto("/notes/n1");
+  await expect(page.locator(".note-title-input")).toHaveValue("My First Note");
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
+  await expect(page.locator("app-note-reminders-panel")).toBeVisible();
+  await page.waitForTimeout(500);
+
+  // HIT-TESTING, not visibility — the distinction this suite has paid for once
+  // already (see e2e/settings/settings-modal.spec.ts, where a `toBeVisible()`
+  // assertion passed while ~30 specs timed out on a click that landed on a
+  // scroller sitting on top). The pane bleeds up to the window's top edge, which
+  // puts its header inside `.shell-drag`: a fixed, full-width, 32px window-drag
+  // strip at `z-index: 8`. Before the pane took a matching rank, the top 12px of
+  // this 30px button hit-tested to that strip — perfectly visible and dead.
+  for (const selector of [
+    "app-note-reminders-panel .panel-head .btn-primary",
+    "app-note-reminders-panel .panel-close",
+  ]) {
+    const reachable = await page.evaluate((sel) => {
+      const el = document.querySelector(sel)!;
+      const r = el.getBoundingClientRect();
+      const results: boolean[] = [];
+      for (const fy of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+        for (const fx of [0.15, 0.5, 0.85]) {
+          const hit = document.elementFromPoint(
+            Math.round(r.left + r.width * fx),
+            Math.round(r.top + r.height * fy),
+          );
+          results.push(!!hit?.closest(sel));
+        }
+      }
+      return results;
+    }, selector);
+    expect(reachable, `${selector} must be clickable everywhere`).toEqual(
+      new Array(15).fill(true),
+    );
+  }
+});
+
+test("creating from the drawer opens the composer with this note attached", async ({
+  page,
+}) => {
+  await mockNotes(page, {}, [], { list_reminders: REMINDERS_FIXTURE });
+  await page.goto("/notes/n1");
+  await expect(page.locator(".note-title-input")).toHaveValue("My First Note");
+
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
+  const panel = page.locator("app-note-reminders-panel");
+  await panel.getByRole("button", { name: "New reminder" }).click();
+
+  // The anchor is what makes this different from the global "New reminder":
+  // the composer opens with the note already in Sources.
+  const composer = page.getByRole("dialog");
+  await expect(composer).toBeVisible();
+  // The chip carries the raw note id, not its title: the panel deliberately
+  // sends `title: ""` and lets the backend resolve a visible one on submit, so
+  // asserting the id is asserting the anchor rather than a display string.
+  await expect(composer.getByText("n1", { exact: true })).toBeVisible();
+});
+
+test("a locked note gets neither the toggle nor the drawer", async ({ page }) => {
+  // `nlk` is the shared mock's locked note — reuse it rather than hand-rolling a
+  // second locked payload that can drift from the one the other specs assert on.
+  await mockNotes(page, {}, [], { list_reminders: REMINDERS_FIXTURE });
+  await page.goto("/notes/nlk");
+
+  // The panel's own filter would already come up empty — the backend drops an
+  // anchor whose source the session cannot see — but a locked note must not
+  // render the surface at all rather than depend on that.
+  await expect(
+    page.getByRole("button", { name: "Reminders", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator("app-note-reminders-panel")).toHaveCount(0);
+});

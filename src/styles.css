@@ -3,6 +3,7 @@
 @import "./design-tokens/layout.css";
 @import "./design-tokens/glass.css";
 @import "./design-tokens/theme-light.css";
+@import "./design-tokens/skin-paper.css";
 @import "./design-tokens/accents.css";
 @import "./app/design-system/primitives.css";
 
@@ -48,8 +49,8 @@ body {
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 15px;
-  line-height: 1.55;
-  letter-spacing: -0.012em;
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
 }
 
 /* --- Atmospheric aurora field (sits behind everything; glass blurs it) -----
@@ -80,7 +81,7 @@ h1, h2, h3, h4 {
   margin: 0 0 var(--space-3);
   color: var(--text-primary);
   font-weight: 600;
-  letter-spacing: -0.025em;
+  letter-spacing: var(--tracking-heading);
   line-height: 1.15;
 }
 h1 { font-size: 1.85rem; font-weight: 650; }
@@ -90,7 +91,7 @@ h4 { font-size: 0.9375rem; }
 p { margin: 0 0 var(--space-3); }
 
 a {
-  color: var(--accent-hover);
+  color: var(--accent-text);
   text-decoration: none;
   transition: color var(--transition);
 }
@@ -154,8 +155,8 @@ app-shell {
 .drill-rail {
   display: flex;
   flex-direction: column;
-  height: calc(100% - 20px);
-  margin: 10px 0 10px 10px;
+  height: calc(100% - 2 * var(--shell-rail-inset));
+  margin: var(--shell-rail-inset) 0 var(--shell-rail-inset) var(--shell-rail-inset);
   padding: 0 var(--space-3) var(--space-4);
   /* Veil (slider-driven opacity) OVER the adaptive glass fill. */
   background:
@@ -163,9 +164,10 @@ app-shell {
     var(--shell-glass-bg);
   -webkit-backdrop-filter: blur(var(--shell-glass-blur)) saturate(var(--shell-glass-saturate));
   backdrop-filter: blur(var(--shell-glass-blur)) saturate(var(--shell-glass-saturate));
-  border: 1px solid var(--shell-glass-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md), var(--shell-glass-inner);
+  border: var(--shell-panel-border);
+  border-right: var(--shell-panel-border-right);
+  border-radius: var(--shell-panel-radius);
+  box-shadow: var(--shell-panel-shadow), var(--shell-glass-inner);
   overflow: hidden;
 }
 
@@ -178,8 +180,12 @@ app-shell {
    edge, so they keep the full Liquid-Glass --radius-xl.) */
 .drill-rail,
 .app-sidebar {
-  border-top-left-radius: var(--radius-md);
-  border-bottom-left-radius: var(--radius-md);
+  /* `min()` so a skin that flattens the panel flattens these two corners with
+     it — a 13px curve left behind on an otherwise square, window-flush rail is
+     the exact "stacked mismatched corners" problem this rule exists to avoid,
+     just in the other direction. */
+  border-top-left-radius: min(var(--radius-md), var(--shell-panel-radius));
+  border-bottom-left-radius: min(var(--radius-md), var(--shell-panel-radius));
 }
 
 .nav-icon {
@@ -206,7 +212,7 @@ app-shell {
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: var(--accent-soft);
-  color: var(--accent-hover);
+  color: var(--accent-text);
   font-family: inherit;
   font-size: 0.8rem;
   font-weight: 600;
@@ -235,7 +241,7 @@ app-shell {
 }
 .unlocked-glyph { display: block; flex: none; }
 .unlocked-count { font-variant-numeric: tabular-nums; }
-.unlocked-label { color: var(--accent-hover); opacity: 0.85; }
+.unlocked-label { color: var(--accent-text); opacity: 0.85; }
 /* The action half — pushed to the trailing edge, a touch bolder. */
 .unlocked-action { margin-left: auto; font-weight: 700; letter-spacing: 0; }
 
@@ -346,9 +352,18 @@ app-shell {
    linked stylesheet. The rail chooses a surface; the adjacent panel contains
    only that surface's navigation. */
 app-shell {
-  gap: var(--space-2);
+  /* NOT `gap`. The shell's flex row ends with several ZERO-WIDTH overlay
+     components — the account-session banner, the filing-recovery banner, the
+     document preview, the reminder composer — and a flex gap is paid between
+     every pair of items, empty or not. Each of them was quietly eating one
+     gutter, so the content column stopped 16px from the window's right edge
+     while the sidebar sat 8px from its left. Invisible while nothing lined up
+     against it; obvious the moment the note's tool pane became a panel like the
+     sidebar and the two gutters had to match. The gutter is a margin on the one
+     item that actually needs it. */
+  gap: 0;
   height: 100vh;
-  padding: var(--space-2);
+  padding: var(--shell-gutter);
   overflow: hidden;
 
   /* Where the content pane actually begins: the shell's own padding, the
@@ -364,13 +379,13 @@ app-shell {
      instead — which is why ~30 settings e2e tests timed out on a click
      rather than failing an assertion. */
   --shell-content-inset: calc(
-    var(--space-2) + var(--shell-sidebar-w) + var(--space-2)
+    var(--shell-gutter) + var(--shell-sidebar-w) + var(--shell-gutter)
   );
 }
 
 app-shell.sidebar-collapsed {
   --shell-content-inset: calc(
-    var(--space-2) + var(--shell-sidebar-w-collapsed) + var(--space-2)
+    var(--shell-gutter) + var(--shell-sidebar-w-collapsed) + var(--shell-gutter)
   );
 }
 
@@ -391,6 +406,7 @@ app-shell.sidebar-collapsed {
   justify-content: flex-end;
   gap: var(--space-1);
   height: var(--shell-topbar-h);
+  margin-top: var(--shell-topbar-lead);
   padding-right: var(--space-2);
 }
 
@@ -454,7 +470,7 @@ app-shell.sidebar-collapsed {
   flex: 0 0 var(--shell-sidebar-w);
   flex-direction: column;
   width: var(--shell-sidebar-w);
-  height: calc(100vh - var(--space-4));
+  height: calc(100vh - 2 * var(--shell-gutter));
   transition: flex-basis var(--transition-fast), width var(--transition-fast);
   margin: 0;
   padding: 0;
@@ -463,9 +479,10 @@ app-shell.sidebar-collapsed {
     var(--shell-glass-bg);
   -webkit-backdrop-filter: blur(var(--shell-glass-blur)) saturate(var(--shell-glass-saturate));
   backdrop-filter: blur(var(--shell-glass-blur)) saturate(var(--shell-glass-saturate));
-  border: 1px solid var(--shell-glass-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md), var(--shell-glass-inner);
+  border: var(--shell-panel-border);
+  border-right: var(--shell-panel-border-right);
+  border-radius: var(--shell-panel-radius);
+  box-shadow: var(--shell-panel-shadow), var(--shell-glass-inner);
   overflow: hidden;
 }
 
@@ -671,7 +688,7 @@ app-shell.sidebar-collapsed {
   gap: var(--space-2);
   height: var(--shell-footer-btn);
   padding: 0 var(--space-3);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   font-size: 0.85rem;
 }
 
@@ -687,7 +704,7 @@ app-shell.sidebar-collapsed {
   width: var(--shell-footer-btn);
   height: var(--shell-footer-btn);
   padding: 0;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
 }
 
 .primary-sidebar .sb-create-more mur-icon {
@@ -1027,7 +1044,10 @@ app-shell.sidebar-collapsed {
 }
 
 app-shell > .main-col {
-  height: calc(100vh - var(--space-4));
+  /* The gutter between the sidebar and the content column — see the note on
+     `app-shell`'s `gap: 0`. */
+  margin-left: var(--shell-gutter);
+  height: calc(100vh - 2 * var(--shell-gutter));
   margin: 0;
   overflow: auto;
 }

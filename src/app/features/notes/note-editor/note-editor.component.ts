@@ -25,6 +25,7 @@ import { RecordingFlushService } from "../../../core/recording-flush.service";
 import { tabKeyFor } from "../../../core/tab-keys";
 import { TabRouteReuseStrategy } from "../../../core/tab-route-reuse.strategy";
 import { TabsService } from "../../../core/tabs.service";
+import { WorkspaceService } from "../../workspace/workspace.service";
 import type {
   AppConfigDto,
   FolderNode,
@@ -69,6 +70,7 @@ import {
   type PropertySchemaField,
 } from "./property-field-types";
 import { ErrorCopyService } from "../../../core/copy/error-copy.service";
+import { NoteRemindersPanelComponent } from "../../reminders/note-reminders-panel/note-reminders-panel.component";
 import { SmartReminderCardComponent } from "../../reminders/smart-reminder-card/smart-reminder-card.component";
 
 /** The autosave indicator state. */
@@ -157,6 +159,7 @@ const FULL_WIDTH_KEY = "murmur-note-full-width";
  * CLOSED (the drawer starts collapsed so the writing surface owns the width).
  */
 const NOTE_CHAT_OPEN_KEY = "murmur-note-chat-open";
+const NOTE_REMINDERS_OPEN_KEY = "murmur-note-reminders-open";
 
 /**
  * The full note editor (FP2): a centered document with a borderless title, a
@@ -191,6 +194,7 @@ const NOTE_CHAT_OPEN_KEY = "murmur-note-chat-open";
     MurToggleComponent,
     MurCopyIdComponent,
     MurIconComponent,
+    NoteRemindersPanelComponent,
     SmartReminderCardComponent,
     FormsModule,
   ],
@@ -200,6 +204,8 @@ const NOTE_CHAT_OPEN_KEY = "murmur-note-chat-open";
 export class NoteEditorComponent {
   private readonly ipc = inject(IpcService);
   private readonly notes = inject(NotesService);
+  /** The sidebar's rows live in this forest; a rename has to reach it too. */
+  private readonly workspace = inject(WorkspaceService);
   private readonly folders = inject(FoldersService);
   private readonly debounce = inject(DebounceService);
   private readonly toast = inject(ToastService);
@@ -379,6 +385,9 @@ export class NoteEditorComponent {
    * {@link NOTE_CHAT_OPEN_KEY}, mirroring {@link fullWidth}. Default COLLAPSED.
    */
   readonly noteChatOpen = signal(this.readStoredChatOpen());
+  /** The per-note reminders drawer. Persisted like the chat drawer, and
+   * mutually exclusive with it — see {@link toggleNoteReminders}. */
+  readonly noteRemindersOpen = signal(this.readStoredRemindersOpen());
 
   /** The note-kind folders (for the Move menu + breadcrumb). */
   readonly noteFolders = signal<NoteFolder[]>([]);
@@ -746,6 +755,40 @@ export class NoteEditorComponent {
     }
   });
 
+  /**
+   * Publish the open tool column's width on `<html>` so the SHELL's tab strip
+   * can keep that much room clear on its right.
+   *
+   * The drawer bleeds up over the strip's band to reach the window's top edge
+   * and it is opaque, so without this a tab scrolled to the end would sit
+   * underneath it — visible-looking and unclickable, which is the exact failure
+   * `e2e/settings/settings-modal.spec.ts` was written about in another part of
+   * the app. A custom property is the channel because the strip is a sibling in
+   * the shell, not a child of this editor; `AppShellComponent` publishes
+   * `--tabs-strip-height` the same way, in the other direction.
+   *
+   * Cleared on destroy — a stale reservation would indent the strip on every
+   * other route.
+   */
+  private readonly _publishDrawerWidth = effect(() => {
+    const open =
+      !this.embedded() && (this.noteChatOpen() || this.noteRemindersOpen());
+    document.documentElement.style.setProperty(
+      "--note-drawer-open-w",
+      open ? "var(--note-drawer-w)" : "0px",
+    );
+  });
+
+  /** Persist the reminders drawer open state (mirrors {@link _persistChatOpen}). */
+  private readonly _persistRemindersOpen = effect(() => {
+    const value = this.noteRemindersOpen();
+    try {
+      localStorage.setItem(NOTE_REMINDERS_OPEN_KEY, value ? "1" : "0");
+    } catch {
+      // Private-mode / storage-disabled — the preference is not persisted.
+    }
+  });
+
   constructor() {
     // Warm the note-folder list (Move menu + breadcrumb) + the note list (tag
     // autocomplete) + the config (note-assistant toggles). Best-effort; a
@@ -757,6 +800,10 @@ export class NoteEditorComponent {
     // fire-and-forget so navigation is instant; the backend re-indexes + re-exports (+
     // auto-titles) in the background. Nothing is lost either way (cheap autosaves already
     // persisted the text).
+    this.destroyRef.onDestroy(() => {
+      // Release the tab strip's reservation; see `_publishDrawerWidth`.
+      document.documentElement.style.removeProperty("--note-drawer-open-w");
+    });
     this.destroyRef.onDestroy(() => void this.runNoteBoundaryWork());
 
     // Root-cause fix (2026-07-15): the callback above ONLY ever fired on a hard close (✕)
@@ -921,6 +968,7 @@ export class NoteEditorComponent {
           title.toLowerCase() !== "untitled"
         ) {
           this.tabsService.setTitle(tabKeyFor("note", id), title);
+          this.workspace.applyItemTitle("note", id, title);
         }
       })
       .catch(() => {
@@ -1210,6 +1258,14 @@ export class NoteEditorComponent {
     const doc = this.note();
     if (doc) {
       this.tabsService.setTitle(tabKeyFor("note", doc.id), value || "Untitled");
+      // ...and the SIDEBAR, for the same reason and on the same terms. Its rows
+      // come from the workspace forest, which nothing was telling about a
+      // rename, so the tree kept the creation-time label ("Untitled") while the
+      // tab strip beside it already showed the typed one. Optimistic like the
+      // tab: the user's typed text is the intent, and it survives a save that is
+      // slow or fails. A local patch, not a reload — a container read per
+      // keystroke to change one string we already hold would be absurd.
+      this.workspace.applyItemTitle("note", doc.id, value || null);
     }
     this.scheduleSave();
   }
@@ -1753,6 +1809,7 @@ export class NoteEditorComponent {
       // OPTIMISTICALLY from every keystroke in `onTitleInput` now, so this call
       // is a reconciling no-op in the common case.
       this.tabsService.setTitle(tabKeyFor("note", doc.id), title || "Untitled");
+      this.workspace.applyItemTitle("note", doc.id, title || null);
       return true;
     } catch (e) {
       return this.handleSaveFailure(
@@ -1762,6 +1819,7 @@ export class NoteEditorComponent {
         (updatedAt) => {
           this.note.update((cur) => (cur ? { ...cur, updatedAt } : cur));
           this.tabsService.setTitle(tabKeyFor("note", doc.id), title || "Untitled");
+          this.workspace.applyItemTitle("note", doc.id, title || null);
         },
       );
     }
@@ -1814,6 +1872,7 @@ export class NoteEditorComponent {
       this.saveErrorMessage.set(null);
       // Live tab-title sync (bug fix, 2026-07-12) — see the twin call in {@link saveText}.
       this.tabsService.setTitle(tabKeyFor("note", doc.id), title || "Untitled");
+      this.workspace.applyItemTitle("note", doc.id, title || null);
       return true;
     } catch (e) {
       return this.handleSaveFailure(
@@ -1834,6 +1893,7 @@ export class NoteEditorComponent {
               : cur,
           );
           this.tabsService.setTitle(tabKeyFor("note", doc.id), title || "Untitled");
+          this.workspace.applyItemTitle("note", doc.id, title || null);
         },
       );
     }
@@ -2567,13 +2627,44 @@ export class NoteEditorComponent {
 
   /** Toggle the "Ask Brain" chat drawer (header button). */
   toggleNoteChat(): void {
-    this.noteChatOpen.update((v) => !v);
+    const next = !this.noteChatOpen();
+    this.noteChatOpen.set(next);
+    // ONE tool column at a time. Both drawers are ~320-400px of the same row,
+    // so opening the second would squeeze the document to a sliver on a normal
+    // window rather than giving the user two panes worth reading side by side.
+    if (next) {
+      this.noteRemindersOpen.set(false);
+    }
+  }
+
+  /** Toggle the per-note reminders drawer (header button). */
+  toggleNoteReminders(): void {
+    const next = !this.noteRemindersOpen();
+    this.noteRemindersOpen.set(next);
+    if (next) {
+      this.noteChatOpen.set(false);
+    }
   }
 
   /** Read the persisted drawer open state; default CLOSED (starts collapsed). */
   private readStoredChatOpen(): boolean {
     try {
       return localStorage.getItem(NOTE_CHAT_OPEN_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  /** As above, for the reminders drawer. If BOTH were somehow persisted open
+   * (an older build, or hand-edited storage), the chat wins and this stays
+   * closed — the mutual exclusion has to hold on restore too, not only on the
+   * click that established it. */
+  private readStoredRemindersOpen(): boolean {
+    try {
+      if (localStorage.getItem(NOTE_CHAT_OPEN_KEY) === "1") {
+        return false;
+      }
+      return localStorage.getItem(NOTE_REMINDERS_OPEN_KEY) === "1";
     } catch {
       return false;
     }

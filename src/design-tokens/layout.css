@@ -1,6 +1,19 @@
 /* Design tokens — generated split of the former styles.css :root (prototype).
    Every value the UI uses lives HERE; components consume var(--token) only. */
 :root {  /* --- Radius (large, soft, Apple-round) ---------------------------------- */
+  /* CONTROLS that are pill-shaped by TASTE, not by function — the tab strip's
+     tabs, the segmented control, the sidebar footer's action row, quick
+     search's mode buttons. A skin legitimately disagrees about these: a full
+     pill reads as an app control, and a document-shaped skin wants the same
+     square-ish corner as everything else it draws.
+
+     Deliberately NOT `--radius-pill` itself. That token has ~190 call sites and
+     most of them are round because a circle or a capsule is what the thing IS —
+     the toggle switch, the scrollbar thumb, the slider and meter tracks,
+     spinners, count badges, avatars. Overriding it would square those off too,
+     which is not a restyle, it is a bug. The split is the whole point: this
+     token means "pill by choice", `--radius-pill` means "pill by nature". */
+  --radius-control: var(--radius-pill);
   --radius-sm: 9px;
   --radius-md: 13px;
   --radius-lg: 18px;
@@ -101,6 +114,30 @@
      and the workspace tree; collapsed it narrows to icons only. The width
      animates between the two, so both ends live here as tokens rather than as
      literals inside the shell chrome in styles.css. */
+  /* --- How the shell FRAMES its panels ------------------------------------
+     Studio floats the sidebar and the content column as rounded panels over the
+     window: a gutter all round, a radius, a border and a shadow. A
+     document-shaped skin wants the opposite — chrome glued to the window edges
+     with a single hairline, the way Notion and Obsidian do it. Every value
+     below is what Studio ships, so the default frame is unchanged.
+
+     `--shell-vertical-inset` was a wart and is now corrected. It used to ship as
+     a literal 10px — NOT the 2x8px gutter it looks like it should be — so the
+     routed editor overhung its column by ~6px. Harmless while nothing lined up
+     against it; visible the moment the note's tool pane had to sit flush with
+     the sidebar's bottom edge, which is what forced the fix. */
+  --shell-gutter: var(--space-2);
+  --shell-vertical-inset: calc(2 * var(--shell-gutter));
+  --shell-rail-inset: 10px;
+  --shell-panel-radius: var(--radius-xl);
+  --shell-panel-shadow: var(--shadow-md);
+  --shell-panel-border: 1px solid var(--shell-glass-border);
+  /* The two edges that face a WINDOW edge rather than content: the sidebar's
+     right, the tool pane's left. A flush skin drops the other three and keeps
+     just one of these as the hairline that separates chrome from document. */
+  --shell-panel-border-right: var(--shell-panel-border);
+  --shell-panel-border-left: var(--shell-panel-border);
+
   --shell-sidebar-w: calc(var(--space-8) * 4);
 
   /* The sidebar's own top row. It holds Search / Settings / Collapse at its
@@ -121,6 +158,19 @@
      No CSS can read the native buttons' real box, so a change to the window
      chrome means re-measuring this one value. */
   --shell-topbar-h: 34px;
+  /* How far the row starts BELOW the panel's own top edge.
+     The 26px centre above is measured from the WINDOW, not from the panel, and
+     it used to arrive for free: 8px gutter + 1px border + 34/2. A skin that
+     glues the panel to the window removes both, which drops the row to a 17px
+     centre and leaves the glyphs sitting visibly above the macOS window
+     buttons — the regression this token exists to cancel. It is the gutter and
+     border a skin gives up, so Paper pays exactly 9px back here. */
+  --shell-topbar-lead: 0px;
+
+  /* The note editor's tool column (Ask Brain, Reminders). A token because TWO
+     things must agree on it: the drawer's own width, and how much room the tab
+     strip must keep clear so a tab can never scroll underneath it. */
+  --note-drawer-w: clamp(320px, 30vw, 400px);
 
   /* The three footer controls — Capture, New note, and the create menu's
      chevron. One token because they must stay identical squares: the moment
@@ -131,6 +181,7 @@
      sits beside it. Capture takes the remaining width; the round one stays
      square, so a single size keeps them on one line. */
   --shell-footer-btn: 36px;
+
   /* Collapsed width: the panel wraps the macOS window buttons with the SAME
      margin on each side.
 

@@ -1637,6 +1637,14 @@ export class IpcService {
     return invoke<void>("complete_reminder", { reminderId, expectedDueAt });
   }
 
+  /** Put a completed reminder back to open — the inverse of the checkbox. */
+  reopenMurmurReminder(
+    reminderId: string,
+    expectedDueAt: number,
+  ): Promise<void> {
+    return invoke<void>("reopen_reminder", { reminderId, expectedDueAt });
+  }
+
   dismissMurmurReminderOccurrence(occurrenceId: string): Promise<void> {
     return invoke<void>("dismiss_reminder_occurrence", { occurrenceId });
   }

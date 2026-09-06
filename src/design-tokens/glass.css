@@ -4,6 +4,10 @@
   --glass-blur: 30px;
   --glass-saturate: 135%;
   --glass-border: rgba(255, 255, 255, 0.10);
+  /* The `.btn` primitive's own ground. It was a raw rgba() inside
+     primitives.css, which made every button in the app unreachable from a
+     skin — see the note at that call site. This is the value that shipped. */
+  --btn-bg: rgba(255, 255, 255, 0.05);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.10); /* top edge gleam */
 
   /* --- Shell liquid glass (PROTOTYPE — Apple TV chrome) --------------------

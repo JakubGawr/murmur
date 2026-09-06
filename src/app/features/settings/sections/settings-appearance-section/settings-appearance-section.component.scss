@@ -89,3 +89,141 @@
   font-variant-numeric: tabular-nums;
 }
     
+
+/* --- Theme skin tiles -----------------------------------------------------
+   Each tile carries a small mock of the skin it selects: its ground, its ink,
+   its accent and — the change people actually notice first — its TYPE, via an
+   "Aa" set in that skin's face. Those five values come from the
+   `--preview-*` tokens in skin-paper.css, which are declared skin-INDEPENDENTLY
+   precisely so a tile can paint Paper while Studio is active, and vice versa.
+   The mock is a 3-value summary, never a copy of the ramp, so there is nothing
+   here that can drift out of sync with a skin's real palette. */
+.theme-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  max-width: 560px;
+}
+.theme-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+.theme-tile:hover {
+  background: var(--surface-hover);
+}
+.theme-tile.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.theme-tile:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+/* The mock. A rail on the left, a "page" on the right — the app's own shape at
+   1/10 scale, which is enough for the eye to match it to the real window. */
+.theme-preview {
+  display: flex;
+  gap: 6px;
+  height: 78px;
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+.tp-rail {
+  flex: none;
+  width: 22px;
+  border-radius: inherit;
+}
+.tp-page {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tp-sample {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+.tp-line {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  opacity: 0.42;
+}
+.tp-line.is-short {
+  width: 58%;
+}
+
+/* Studio: round corners, a lifted translucent rail, the grotesque face. */
+.preview-studio {
+  border-radius: var(--preview-studio-radius);
+  background: var(--preview-studio-bg);
+  color: var(--preview-studio-ink);
+}
+.preview-studio .tp-rail {
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--preview-studio-ink) 12%, transparent);
+}
+.preview-studio .tp-sample {
+  font-family: var(--preview-studio-font);
+  letter-spacing: -0.02em;
+  color: var(--preview-studio-accent);
+}
+.preview-studio .tp-line {
+  background: var(--preview-studio-ink);
+}
+
+/* Paper: tight corners, a hairline rail, the serif. */
+.preview-paper {
+  border-radius: var(--preview-paper-radius);
+  background: var(--preview-paper-bg);
+  color: var(--preview-paper-ink);
+}
+.preview-paper .tp-rail {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--preview-paper-ink) 8%, transparent);
+}
+.preview-paper .tp-sample {
+  font-family: var(--preview-paper-font);
+  letter-spacing: 0;
+  color: var(--preview-paper-accent);
+}
+.preview-paper .tp-line {
+  background: var(--preview-paper-ink);
+}
+
+.theme-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.theme-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+.theme-check {
+  flex: none;
+  color: var(--accent-text);
+}
+.theme-desc {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}

@@ -315,7 +315,7 @@ test("Reminders: source invalidation masks a cached title before canonical refre
 
   await page.goto("/reminders");
   const sourceChip = page
-    .locator(".source-chip")
+    .locator(".row-source")
     .filter({ hasText: "Sealed source title" });
   await expect(sourceChip).toBeVisible();
 
@@ -525,7 +525,7 @@ test("Reminder composer: source invalidation closes and purges an open edit", as
   await page.goto("/reminders");
   await expect(page.getByText("Composer reminder")).toBeVisible();
   await page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Composer reminder" })
     .getByRole("button", { name: "Edit" })
     .click();
@@ -655,7 +655,7 @@ test("Reminders: global visibility invalidation purges every cached source and c
   await page.goto("/reminders");
   await expect(page.getByText("Global inbox source")).toBeVisible();
   await page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Global inbox reminder" })
     .getByRole("button", { name: "Edit" })
     .click();
@@ -1206,7 +1206,7 @@ test("Reminder composer: a request created before the listener barrier is discar
 
   await page.goto("/reminders");
   const reminder = page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Source-bearing edit request" });
   await expect(
     reminder.getByText("Composer private source title"),
@@ -1440,12 +1440,20 @@ test("Reminder composer: focus, source limit, and busy source locking stay coher
 
   await page.goto("/reminders");
   const row = page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Twenty-source reminder" });
   const edit = row.getByRole("button", { name: "Edit" });
   const composer = page.locator("app-reminder-composer");
 
-  await edit.click();
+  // SIMULATE WEBKIT'S CLICK so Chromium exercises the same path. Safari does not
+  // focus a <button> on click (the macOS convention), so `document.activeElement`
+  // stays <body> and the composer can only restore focus through the pointer
+  // target it remembered. `dispatchEvent` moves no focus, and `mousedown` still
+  // feeds `rememberPointerTarget` — which is what a real WebKit click does.
+  // Without this, Chromium focuses the button, never reaches the fallback, and a
+  // broken fallback ships green here while failing the webkit lane.
+  await edit.locator("svg").first().dispatchEvent("mousedown");
+  await edit.dispatchEvent("click");
   const dialog = composer.getByRole("dialog");
   const titleInput = composer.locator('input[type="text"]').first();
   await expect(titleInput).toBeFocused();
@@ -2256,13 +2264,15 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
 
   // Inbox confirm-then-refresh actions.
   await page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Book the pilot review" })
-    .getByRole("button", { name: "Complete" })
+    // Complete is the CIRCLE now (Apple Reminders' shape), so it is addressed by
+    // role `checkbox` and by what a click will DO, not by a button label.
+    .getByRole("checkbox", { name: /^Complete / })
     .click();
   await expect(page.getByText("Book the pilot review")).toHaveCount(0);
   await page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Send the roadmap follow-up" })
     .getByRole("button", { name: "Dismiss" })
     .click();
@@ -2270,10 +2280,10 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
 
   await page.getByRole("button", { name: "Upcoming" }).click();
   const recurringUpcoming = page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Book the pilot review" });
   const dismissedOneOff = page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Send the roadmap follow-up" });
   await expect(recurringUpcoming).toBeVisible();
   await expect(dismissedOneOff).toBeVisible();
@@ -2291,7 +2301,8 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
     }).format(new Date(reminder.dueAt));
   });
   await expect(
-    recurringUpcoming.locator(".reminder-meta span").first(),
+    // `.reminder-meta` became `.row-meta` in the "one row component" refactor.
+    recurringUpcoming.locator(".row-meta span").first(),
   ).toHaveText(nextRecurringLabel);
   expect(
     await page.evaluate(() => {
@@ -2304,7 +2315,16 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
       };
     }),
   ).toEqual({ state: "active", remainsPastDue: true });
-  await expect(page.getByText("✦ Smart").first()).toBeVisible();
+  // The badge lost its word when the row took Apple Reminders' shape: it renders
+  // the glyph alone and carries the meaning in `title`. Assert the marker AND its
+  // description, so this still proves a smart-origin reminder is labelled rather
+  // than just proving some star is on screen.
+  const smartBadge = page.locator(".smart-badge").first();
+  await expect(smartBadge).toBeVisible();
+  await expect(smartBadge).toHaveAttribute(
+    "title",
+    "Created from a reviewed Smart suggestion",
+  );
   await page.getByRole("button", { name: "Completed" }).click();
   await expect(page.getByText("Book the pilot review")).toHaveCount(0);
   await expect(page.getByText("Send the roadmap follow-up")).toHaveCount(0);
@@ -2356,7 +2376,7 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
   // Meeting context: manual source prefill, Escape in-dialog, explicit
   // suggestion dismiss, then edit-before-accept with Smart provenance.
   await page
-    .locator(".reminder-card")
+    .locator("app-reminder-row")
     .filter({ hasText: "Confirm the Atlas launch owner" })
     .getByRole("button", { name: /Meeting · Q2 Roadmap Planning/ })
     .click();
@@ -2421,9 +2441,30 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
     .click();
   const noteCard = page.locator("app-smart-reminder-card");
   await expect(noteCard).toBeVisible();
-  await noteCard.getByRole("button", { name: "New reminder" }).click();
-  await expect(composer.getByText("Atlas — PRD v3")).toBeVisible();
+  // The card's own create button is gone: 701be0fc replaced the inline action with
+  // the note's Reminders drawer, and the card is mounted with
+  // `[showCreateAction]="false"`. Clicking a button that no longer renders is what
+  // hung this test for its full 90s budget. Same intent — routed authored-note
+  // context reaching the composer — driven through the affordance that replaced it.
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
+  const notePanel = page.locator("app-note-reminders-panel");
+  await expect(notePanel).toBeVisible();
+  await notePanel.getByRole("button", { name: "New reminder" }).click();
+  // The anchor arrives WITHOUT a title, and that is the lock model working, not a
+  // regression: both this panel and the smart card open the composer with
+  // `title: ""` on purpose — "the parent title is deliberately never trusted
+  // here … submit re-gates it and the canonical list can resolve a visible
+  // title". The old assertion read "Atlas — PRD v3" because the card's create
+  // action used a source from a GATED AUDIT, which had already earned a title.
+  // The drawer has no audit behind it, so it carries the opaque id — which is
+  // still the thing this block exists to prove: routed authored-note context
+  // reaches the composer. Matches note-reminders-drawer.spec.ts.
+  await expect(composer.getByText("n-atlas-prd", { exact: true })).toBeVisible();
   await composer.getByRole("button", { name: "Cancel" }).click();
+  // Leave the drawer as this block found it — the assertions after this one read
+  // the note surface, not the drawer.
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
+  await expect(notePanel).toHaveCount(0);
 
   // A committed authored-note edit updates sourceRevision and re-audits once
   // after the debounce, instead of once per keystroke/autosave frame.
