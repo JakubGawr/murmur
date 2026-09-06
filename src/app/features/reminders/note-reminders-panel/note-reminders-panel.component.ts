@@ -8,6 +8,7 @@ import {
   output,
   signal,
 } from "@angular/core";
+import { MurIconComponent } from "../../../design-system/icon/icon.component";
 import type { ReminderView } from "../../../core/models";
 import { ReminderComposerService } from "../reminder-composer/reminder-composer.service";
 import { RemindersStore } from "../reminders.store";
@@ -38,6 +39,7 @@ import { anchoredTo, reminderRow, type ReminderRowVm } from "../reminder-row";
 @Component({
   selector: "app-note-reminders-panel",
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MurIconComponent],
   templateUrl: "./note-reminders-panel.component.html",
   styleUrl: "./note-reminders-panel.component.scss",
 })

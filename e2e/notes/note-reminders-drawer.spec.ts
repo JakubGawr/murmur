@@ -15,7 +15,7 @@ import { mockNotes } from "./mock-invoke";
  * pass against a no-op filter.
  */
 
-/** Two of these three must never reach a drawer opened on note `n1`. */
+/** Two of these four must never reach a drawer opened on note `n1`. */
 const REMINDERS_FIXTURE = {
   inbox: [],
   upcoming: [
@@ -49,6 +49,20 @@ const REMINDERS_FIXTURE = {
     },
   ],
   completed: [
+    {
+      id: "r-mine-done",
+      title: "Already handled on this note",
+      details: null,
+      dueAt: 1893499200000,
+      repeatEvery: null,
+      repeatUnit: null,
+      state: "completed",
+      origin: "manual",
+      createdAt: 1893400000000,
+      updatedAt: 1893400000000,
+      completedAt: 1893450000000,
+      sources: [{ kind: "note", id: "n1", title: "My First Note" }],
+    },
     {
       id: "r-meeting",
       title: "Belongs to a meeting",
@@ -95,11 +109,43 @@ test("the note's Reminders drawer lists ONLY reminders anchored to this note", a
   await expect(
     panel.getByText("Follow up on the migration plan"),
   ).toBeVisible();
+  await expect(panel.getByText("Already handled on this note")).toBeVisible();
   await expect(panel.getByText("Belongs to a different note")).toHaveCount(0);
   await expect(panel.getByText("Belongs to a meeting")).toHaveCount(0);
-  await expect(panel.locator(".panel-row")).toHaveCount(1);
+  await expect(panel.locator(".panel-row")).toHaveCount(2);
 
   expect(consoleErrors).toEqual([]);
+});
+
+test("the row's circle carries completion state, and a done one cannot be un-done", async ({
+  page,
+}) => {
+  await mockNotes(page, {}, [], { list_reminders: REMINDERS_FIXTURE });
+  await page.goto("/notes/n1");
+  await expect(page.locator(".note-title-input")).toHaveValue("My First Note");
+  await page.getByRole("button", { name: "Reminders", exact: true }).click();
+
+  const open = page.getByRole("checkbox", {
+    name: "Complete Follow up on the migration plan",
+  });
+  await expect(open).toHaveAttribute("aria-checked", "false");
+  await expect(open).toBeEnabled();
+
+  // There is no command to reopen a reminder — `ReminderDraft` carries no state
+  // — so the finished circle must be a DISABLED checkbox rather than a control
+  // that looks live and does nothing when clicked.
+  const done = page.getByRole("checkbox", {
+    name: "Completed: Already handled on this note",
+  });
+  await expect(done).toHaveAttribute("aria-checked", "true");
+  await expect(done).toBeDisabled();
+
+  // The strikethrough is the sighted half of that same state.
+  const struck = await page
+    .locator(".panel-row.is-done .row-title span")
+    .first()
+    .evaluate((el) => getComputedStyle(el).textDecorationLine);
+  expect(struck).toContain("line-through");
 });
 
 test("the drawer and Ask Brain are mutually exclusive, and the drawer persists", async ({
