@@ -8,23 +8,14 @@ import {
 } from "@angular/core";
 import { TabsService } from "../../../core/tabs.service";
 import type {
-  ReminderInboxItem,
   ReminderSourceView,
   ReminderView,
 } from "../../../core/models";
 import { ReminderComposerService } from "../reminder-composer/reminder-composer.service";
+import { reminderRow, type ReminderRowVm } from "../reminder-row";
 import { RemindersStore } from "../reminders.store";
 
 type ReminderSegment = "inbox" | "upcoming" | "completed";
-
-interface ReminderRowVm {
-  key: string;
-  occurrenceId: string | null;
-  expectedDueAt: number;
-  reminder: ReminderView;
-  dueLabel: string;
-  recurrenceLabel: string | null;
-}
 
 interface ReminderGroupVm {
   id: string;
@@ -32,43 +23,10 @@ interface ReminderGroupVm {
   rows: ReminderRowVm[];
 }
 
-const DATE_TIME = new Intl.DateTimeFormat(undefined, {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
-
 const MONTH_YEAR = new Intl.DateTimeFormat(undefined, {
   month: "long",
   year: "numeric",
 });
-
-function recurrenceLabel(reminder: ReminderView): string | null {
-  if (!reminder.repeatEvery || !reminder.repeatUnit) {
-    return null;
-  }
-  const singular = reminder.repeatUnit.slice(0, -1);
-  return reminder.repeatEvery === 1
-    ? `Every ${singular}`
-    : `Every ${reminder.repeatEvery} ${reminder.repeatUnit}`;
-}
-
-function reminderRow(
-  reminder: ReminderView,
-  occurrence?: ReminderInboxItem,
-): ReminderRowVm {
-  const expectedDueAt = occurrence?.dueAt ?? reminder.dueAt;
-  return {
-    key: occurrence?.occurrenceId ?? reminder.id,
-    occurrenceId: occurrence?.occurrenceId ?? null,
-    expectedDueAt,
-    reminder,
-    dueLabel: DATE_TIME.format(new Date(expectedDueAt)),
-    recurrenceLabel: recurrenceLabel(reminder),
-  };
-}
 
 @Component({
   selector: "app-reminders",

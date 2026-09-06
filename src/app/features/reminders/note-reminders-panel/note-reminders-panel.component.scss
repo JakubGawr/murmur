@@ -1,0 +1,185 @@
+/* The panel fills the drawer column the editor gives it; the header stays put
+   and only the list scrolls, so the "New reminder" action is always reachable
+   however long the list gets. The drawer's own frame (width, divider, surface)
+   belongs to the editor — see `.note-tool-drawer` — because it is shared with
+   the Ask Brain pane and the two must not drift apart. */
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex: none;
+  /* Matches the note header's own band so the two line up across the divider. */
+  min-height: 52px;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.panel-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+.panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.panel-head .btn {
+  height: 30px;
+  padding: 0 var(--space-3);
+  font-size: 0.8rem;
+}
+.panel-close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.panel-close:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.panel-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.panel-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+
+.panel-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3);
+}
+
+.panel-empty {
+  margin: var(--space-5) 0 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  text-align: center;
+}
+.panel-empty p {
+  margin: 0 0 var(--space-2);
+}
+.panel-empty-hint {
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+}
+
+.panel-group + .panel-group {
+  margin-top: var(--space-5);
+}
+.panel-group h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A row is a quiet in-flow panel, not a floating card: this column is already
+   a raised surface, and stacking another translucent card on it reads as mush. */
+.panel-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-input);
+}
+.panel-row.is-done {
+  opacity: 0.62;
+}
+.panel-row.is-done .row-title span:first-child {
+  text-decoration: line-through;
+}
+
+.row-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.smart-badge {
+  flex: none;
+  color: var(--accent-text);
+  font-size: 0.75rem;
+}
+.row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+}
+.row-details {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+.row-actions .btn {
+  height: 26px;
+  padding: 0 var(--space-2);
+  font-size: 0.75rem;
+}
+.row-danger {
+  color: var(--danger);
+}
+
+.row-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}

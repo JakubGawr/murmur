@@ -147,6 +147,23 @@
           </button>
         </div>
 
+        <!-- Reminders — toggles the right-side per-note drawer (below). Icon-only,
+             sitting beside Edit/Preview because it is the same kind of control: a
+             view of THIS note, not an action on it. The glyph is the design
+             system's `reminders` icon, the same one the sidebar's Reminders
+             destination uses, so the symbol means one thing across the app. -->
+        <button
+          type="button"
+          class="btn btn-ghost head-btn head-icon-btn"
+          [class.is-active]="noteRemindersOpen()"
+          [attr.aria-expanded]="noteRemindersOpen()"
+          (click)="toggleNoteReminders()"
+          aria-label="Reminders"
+          title="Reminders for this note"
+        >
+          <mur-icon icon="reminders" />
+        </button>
+
         <!-- Ask Brain — toggles the right-side chat drawer (below). Hidden when
              locked (like Share). Inline SVG spark glyph (no icon lib, per convention). -->
         <button
@@ -679,6 +696,7 @@
               [sourceId]="doc.id"
               [sourceTitle]="title() || doc.title"
               [sourceRevision]="doc.updatedAt"
+              [showCreateAction]="false"
             />
           }
 
@@ -688,6 +706,26 @@
   </div>
   </div>
   <!-- /.editor-col (note pane) -->
+
+  <!-- ===== Reminders drawer (right COLUMN) — same frame as the Ask Brain pane
+       below (`.note-tool-drawer`), same gating: ROUTED mode only, never behind a
+       lock. A locked note must not reach this at all — the panel's own filter
+       would already come up empty, because the backend drops an anchor whose
+       source this session cannot see, but a view of a locked note should not
+       render in the first place rather than rely on that. ===== -->
+  @if (!embedded() && noteRemindersOpen() && note(); as doc) {
+    @if (!doc.locked) {
+      <aside
+        class="note-tool-drawer"
+        aria-label="Reminders for this note"
+      >
+        <app-note-reminders-panel
+          [noteId]="doc.id"
+          (closed)="toggleNoteReminders()"
+        />
+      </aside>
+    }
+  }
 
   <!-- ===== Ask Brain drawer (right COLUMN) — the "Ask about this note" chat as a
        full-height PANE beside the note column: its own header band (aligned with the

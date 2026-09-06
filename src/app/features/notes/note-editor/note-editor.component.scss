@@ -210,6 +210,21 @@
 .head-btn.is-shared {
   color: var(--accent-hover);
 }
+/* Icon-only header toggle (Reminders). `.btn` pads for a text label, so square
+   it and centre the glyph — the same correction `.head-seg .seg-btn-icon` makes
+   above, kept at `.head-btn`'s 32px so the header row stays one height. Active
+   (drawer-open) reads as a pressed neutral pill with an accent glyph, matching
+   `.head-chat-btn.is-active` rather than inventing a second active language. */
+.head-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  padding: 0;
+}
+.head-icon-btn.is-active {
+  background: var(--surface-hover);
+  color: var(--accent-text);
+}
 /* Ask Brain toggle: the glyph adopts the accent, and the active (drawer-open)
    state reads as a pressed neutral pill with the accent glyph/label. */
 .head-chat-btn {
@@ -354,7 +369,8 @@
    A full-height second COLUMN beside the note — not a floating overlay, not a bar hanging off the
    header. It carries its OWN header band (the chat's `.chat-head`, aligned with the note header)
    and is separated from the note pane by ONE continuous hairline that runs top-to-bottom. */
-.note-chat-drawer {
+.note-chat-drawer,
+.note-tool-drawer {
   /* Full-height pane (2026-07-19 redesign): `.editor-main` is a stretch flex ROW spanning the whole
      editor, so this pane runs from the very top to the very bottom — its header band lines up with
      the note header, and the divider below is one unbroken vertical line (fixing the old "welded at
@@ -800,7 +816,8 @@
   .note-doc {
     transition: none;
   }
-  .note-chat-drawer {
+  .note-chat-drawer,
+  .note-tool-drawer {
     animation: none;
   }
 }

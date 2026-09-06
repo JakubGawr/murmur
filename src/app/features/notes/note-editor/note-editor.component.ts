@@ -69,6 +69,7 @@ import {
   type PropertySchemaField,
 } from "./property-field-types";
 import { ErrorCopyService } from "../../../core/copy/error-copy.service";
+import { NoteRemindersPanelComponent } from "../../reminders/note-reminders-panel/note-reminders-panel.component";
 import { SmartReminderCardComponent } from "../../reminders/smart-reminder-card/smart-reminder-card.component";
 
 /** The autosave indicator state. */
@@ -157,6 +158,7 @@ const FULL_WIDTH_KEY = "murmur-note-full-width";
  * CLOSED (the drawer starts collapsed so the writing surface owns the width).
  */
 const NOTE_CHAT_OPEN_KEY = "murmur-note-chat-open";
+const NOTE_REMINDERS_OPEN_KEY = "murmur-note-reminders-open";
 
 /**
  * The full note editor (FP2): a centered document with a borderless title, a
@@ -191,6 +193,7 @@ const NOTE_CHAT_OPEN_KEY = "murmur-note-chat-open";
     MurToggleComponent,
     MurCopyIdComponent,
     MurIconComponent,
+    NoteRemindersPanelComponent,
     SmartReminderCardComponent,
     FormsModule,
   ],
@@ -379,6 +382,9 @@ export class NoteEditorComponent {
    * {@link NOTE_CHAT_OPEN_KEY}, mirroring {@link fullWidth}. Default COLLAPSED.
    */
   readonly noteChatOpen = signal(this.readStoredChatOpen());
+  /** The per-note reminders drawer. Persisted like the chat drawer, and
+   * mutually exclusive with it — see {@link toggleNoteReminders}. */
+  readonly noteRemindersOpen = signal(this.readStoredRemindersOpen());
 
   /** The note-kind folders (for the Move menu + breadcrumb). */
   readonly noteFolders = signal<NoteFolder[]>([]);
@@ -741,6 +747,16 @@ export class NoteEditorComponent {
     const value = this.noteChatOpen();
     try {
       localStorage.setItem(NOTE_CHAT_OPEN_KEY, value ? "1" : "0");
+    } catch {
+      // Private-mode / storage-disabled — the preference is not persisted.
+    }
+  });
+
+  /** Persist the reminders drawer open state (mirrors {@link _persistChatOpen}). */
+  private readonly _persistRemindersOpen = effect(() => {
+    const value = this.noteRemindersOpen();
+    try {
+      localStorage.setItem(NOTE_REMINDERS_OPEN_KEY, value ? "1" : "0");
     } catch {
       // Private-mode / storage-disabled — the preference is not persisted.
     }
@@ -2567,13 +2583,44 @@ export class NoteEditorComponent {
 
   /** Toggle the "Ask Brain" chat drawer (header button). */
   toggleNoteChat(): void {
-    this.noteChatOpen.update((v) => !v);
+    const next = !this.noteChatOpen();
+    this.noteChatOpen.set(next);
+    // ONE tool column at a time. Both drawers are ~320-400px of the same row,
+    // so opening the second would squeeze the document to a sliver on a normal
+    // window rather than giving the user two panes worth reading side by side.
+    if (next) {
+      this.noteRemindersOpen.set(false);
+    }
+  }
+
+  /** Toggle the per-note reminders drawer (header button). */
+  toggleNoteReminders(): void {
+    const next = !this.noteRemindersOpen();
+    this.noteRemindersOpen.set(next);
+    if (next) {
+      this.noteChatOpen.set(false);
+    }
   }
 
   /** Read the persisted drawer open state; default CLOSED (starts collapsed). */
   private readStoredChatOpen(): boolean {
     try {
       return localStorage.getItem(NOTE_CHAT_OPEN_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  /** As above, for the reminders drawer. If BOTH were somehow persisted open
+   * (an older build, or hand-edited storage), the chat wins and this stays
+   * closed — the mutual exclusion has to hold on restore too, not only on the
+   * click that established it. */
+  private readStoredRemindersOpen(): boolean {
+    try {
+      if (localStorage.getItem(NOTE_CHAT_OPEN_KEY) === "1") {
+        return false;
+      }
+      return localStorage.getItem(NOTE_REMINDERS_OPEN_KEY) === "1";
     } catch {
       return false;
     }

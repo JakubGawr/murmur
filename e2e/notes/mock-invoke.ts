@@ -16,6 +16,12 @@ import { mockTauri } from "../settings-ai/mock-invoke";
  * the demo mock's benign defaults, so the app always boots. `get_config` here
  * carries the note-assistant toggles ON so the editor's popover picker renders.
  *
+ * `constants` is the escape hatch for the closure rule above: each value is
+ * JSON-serialized and replayed page-side as a constant-returning handler, so a
+ * large fixture can stay a normal test-scope `const` instead of being inlined
+ * inside an arrow function (and duplicated once per test). It forwards straight
+ * to `mockTauri`'s own `constants` slot.
+ *
  * `extra` layers per-spec command overrides into the SAME `mockTauri` call (the base
  * mock re-installs `window.__TAURI_INTERNALS__` from scratch, so a SECOND `mockTauri`
  * call would wipe these Notes overrides — everything must go through one call). Keys
@@ -25,6 +31,7 @@ export async function mockNotes(
   page: Page,
   extra: Record<string, (args: any) => unknown> = {},
   delayedEventListeners: string[] = [],
+  constants: Record<string, unknown> = {},
 ): Promise<void> {
   await mockTauri(page, {
     // --- config (note-assistant toggles ON so the popover shows every action) ---
@@ -410,7 +417,7 @@ export async function mockNotes(
 
     // --- per-spec overrides win over the Notes defaults above ---
     ...extra,
-  }, {}, [], delayedEventListeners);
+  }, constants, [], delayedEventListeners);
 }
 
 /**
