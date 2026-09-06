@@ -21,6 +21,22 @@
   --tracking-heading: -0.025em;
   --leading-body: 1.55;
 
+  /* --- The note document's two type surfaces -----------------------------
+     Rendered markdown (`.md-body`, the shared app-markdown renderer) and the
+     plain-text WRITING surface (the editor's textarea plus the hidden mirror
+     that sizes it) shipped DIFFERENT metrics — 15px/1.66 reading against
+     16px/1.7 writing — so the same note reflowed slightly every time you
+     toggled between them. Both are tokens now, defaulting to exactly those
+     shipped values, so nothing moves until a skin says otherwise.
+
+     `--leading-body` above does NOT reach either surface: both declare their
+     own line-height, which is the whole reason a skin could restyle the app's
+     chrome and leave the prose untouched. */
+  --prose-size: 15px;
+  --prose-leading: 1.66;
+  --note-write-size: 1rem;
+  --note-write-leading: 1.7;
+
   /* Compact command/picker hierarchy shared by dense workspace chrome. */
   --type-command-label: 0.84rem;
   --type-command-caption: 0.72rem;

@@ -339,3 +339,31 @@
     --shell-active-icon: #22201d;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PAPER — the note document reads and writes at ONE size.
+
+   Scoped to `.note-doc` rather than set at :root on purpose. `--prose-*` is
+   read by the SHARED markdown renderer, which also draws Ask answers, chat
+   bubbles, panel previews, the weekly digest and quick-search results;
+   enlarging all of those is a different decision from making the document
+   comfortable, and it is not the one that was asked for. A global stylesheet
+   may target a component's class like this — encapsulation scopes a
+   COMPONENT's styles, it does not stop global rules matching — and custom
+   properties inherit across component boundaries, so re-pointing them here
+   reaches `.md-body` inside the child renderer without `::ng-deep`.
+
+   Theme-independent: type metrics carry no light/dark information.
+
+   16px/1.7 in BOTH surfaces also removes a defect that predates this skin —
+   reading at 15px/1.66 and writing at 16px/1.7 meant the same paragraph broke
+   at different words in the two modes, so the text visibly shifted on every
+   toggle. Studio still has that; fixing it there changes the shipped default
+   for every existing user, which is a product call, not a skin's to make.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root[data-skin="paper"] .note-doc {
+  --prose-size: 16px;
+  --prose-leading: 1.7;
+  --note-write-size: 16px;
+  --note-write-leading: 1.7;
+}

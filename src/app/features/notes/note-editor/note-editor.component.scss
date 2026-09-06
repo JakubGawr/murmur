@@ -714,8 +714,11 @@
   min-height: 60vh;
   box-sizing: border-box;
   font: inherit;
-  font-size: 1rem;
-  line-height: 1.7;
+  /* The textarea and its hidden `::after` mirror MUST stay typographically
+     identical or the auto-grow measurement drifts — that is why they share one
+     rule, and why these are one pair of tokens rather than two. */
+  font-size: var(--note-write-size);
+  line-height: var(--note-write-leading);
   padding: 0;
   border: 0;
   margin: 0;

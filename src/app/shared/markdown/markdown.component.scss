@@ -1,7 +1,11 @@
 .md-body {
   color: var(--text-primary);
-  font-size: 15px;
-  line-height: 1.66;
+  /* Tokens rather than literals so a skin (or a single surface — see
+     `.note-doc` in skin-paper.css) can retune reading comfort. Custom
+     properties inherit ACROSS component boundaries, which is what lets an
+     ancestor re-point these for its own subtree without `::ng-deep`. */
+  font-size: var(--prose-size);
+  line-height: var(--prose-leading);
   overflow-wrap: anywhere;
 }
 .md-body.md-compact {
