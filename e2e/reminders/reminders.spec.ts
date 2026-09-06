@@ -2293,7 +2293,8 @@ test("Reminders: route, composer, inbox, Smart review, context, and event refres
     }).format(new Date(reminder.dueAt));
   });
   await expect(
-    recurringUpcoming.locator(".reminder-meta span").first(),
+    // `.reminder-meta` became `.row-meta` in the "one row component" refactor.
+    recurringUpcoming.locator(".row-meta span").first(),
   ).toHaveText(nextRecurringLabel);
   expect(
     await page.evaluate(() => {

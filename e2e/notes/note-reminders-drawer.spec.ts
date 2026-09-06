@@ -112,7 +112,9 @@ test("the note's Reminders drawer lists ONLY reminders anchored to this note", a
   await expect(panel.getByText("Already handled on this note")).toBeVisible();
   await expect(panel.getByText("Belongs to a different note")).toHaveCount(0);
   await expect(panel.getByText("Belongs to a meeting")).toHaveCount(0);
-  await expect(panel.locator(".panel-row")).toHaveCount(2);
+  // `.panel-row` died with the "one row component" refactor: the panel now renders
+  // <app-reminder-row>, whose own markup is row-check / row-body / row-title.
+  await expect(panel.locator("app-reminder-row")).toHaveCount(2);
 
   expect(consoleErrors).toEqual([]);
 });
@@ -162,7 +164,7 @@ test("the row's circle carries completion state and toggles BOTH ways", async ({
 
   // The strikethrough is the sighted half of that same state.
   const struck = await page
-    .locator(".panel-row.is-done .row-title span")
+    .locator("app-reminder-row.is-done .row-title span")
     .first()
     .evaluate((el) => getComputedStyle(el).textDecorationLine);
   expect(struck).toContain("line-through");
@@ -203,7 +205,15 @@ test("the drawer reaches the top and the tab strip keeps its width clear", async
   page,
 }) => {
   await mockNotes(page, {}, [], { list_reminders: REMINDERS_FIXTURE });
-  await page.goto("/notes/n1");
+  // This test MEASURES the tab strip, and `.tab-strip` only exists while a tab is
+  // open (`@if (tabs().length > 0)` in tab-strip.component.html). A `goto`
+  // deep-link deliberately opens NO tab, so going straight to /notes/n1 left
+  // `document.querySelector(".tab-strip")` null and the measurement threw before
+  // it could assert anything. Open the note the way a user does — the same
+  // pattern tab-strip-drilldown-clearance.spec.ts uses.
+  await page.goto("/notes");
+  await page.getByRole("button", { name: "My First Note" }).click();
+  await expect(page.locator(".tab-strip .tab-item")).toHaveCount(1);
   await expect(page.locator(".note-title-input")).toHaveValue("My First Note");
   await page.getByRole("button", { name: "Reminders", exact: true }).click();
   await expect(page.locator("app-note-reminders-panel")).toBeVisible();
