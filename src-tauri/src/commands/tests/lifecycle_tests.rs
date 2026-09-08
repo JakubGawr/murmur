@@ -29175,6 +29175,450 @@
         );
     }
 
+    /// `OrgSyncReport` crosses IPC, so its SERIALIZED key names are the contract — not the Rust
+    /// field names, and not what a hand-written frontend mock happens to say (`rust-tauri.md` §2b,
+    /// `angular-zoneless.md` T6). A snake_case `more_pending` would arrive as `undefined`, and the
+    /// panel would go back to calling a capped sync "up to date" with nothing failing anywhere.
+    #[test]
+    fn org_sync_report_wire_shape_is_camel_case() {
+        let json = serde_json::to_value(crate::storage::models::OrgSyncReport {
+            pulled: 8,
+            ingested: 6,
+            tombstoned: 1,
+            last_seq: 42,
+            fts_only: false,
+            errors: vec!["item x: live entry missing blob".into()],
+            authors_backfilled: 2,
+            more_pending: true,
+        })
+        .unwrap();
+        let keys: Vec<String> = json
+            .as_object()
+            .expect("the report serializes as an object")
+            .keys()
+            .cloned()
+            .collect();
+        for key in &keys {
+            assert!(
+                !key.contains('_')
+                    && key
+                        .chars()
+                        .next()
+                        .is_some_and(|c| c.is_ascii_lowercase() && c.is_ascii_alphabetic()),
+                "`{key}` is not camelCase — the frontend reads these keys verbatim"
+            );
+        }
+        assert!(
+            keys.iter().any(|k| k == "morePending"),
+            "the drain's honesty flag must reach the frontend: {keys:?}"
+        );
+        assert_eq!(json["morePending"], serde_json::json!(true));
+    }
+
+    /// A drain must not stop on an AUTHOR-BACKFILL turn and call the org caught up.
+    ///
+    /// `org_sync_one` alternates a live-cursor turn with a bounded author-backfill turn whenever any
+    /// local row still has a NULL `author_user_id`. A backfill turn spends the invocation WITHOUT
+    /// consulting the live cursor, and it legitimately repairs ZERO rows — here the re-pull answers
+    /// with an empty page, one of four ways that happens in production. Both `pulled` and
+    /// `authors_backfilled` therefore read zero for that page.
+    ///
+    /// RED on the count-based continuation (`pulled >= PAGE || backfilled > 0`): the drain concluded
+    /// "nothing happened, so the feed must be exhausted" about a page that never asked, returned
+    /// `pulled: 0, more_pending: false`, and the panel toasted "Synced — up to date." with the
+    /// server still holding items — the same lie the drain exists to remove, reached from the other
+    /// side. Reproduced by the adversarial verifier before this test existed.
+    ///
+    /// The seeded NULL-author row sits at seq 3 with the cursor at 0, so the FIRST invocation takes
+    /// the backfill turn; the drain must go on to the live page behind it.
+    #[test]
+    fn a_drain_does_not_mistake_an_author_backfill_turn_for_a_caught_up_feed() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            let mut served = 0usize;
+            let mut live_pages = 0usize;
+            // Generous, because `ORG_AUTHOR_BACKFILL_TURN` is a PROCESS-GLOBAL atomic that a sibling
+            // test also toggles: under a parallel run this drain can be handed extra backfill turns,
+            // and a tight request budget would turn that interleave into a flake rather than a
+            // finding. The empty `sinceSeq=2` answer is idempotent, so serving more of them is free.
+            while served < 12 && std::time::Instant::now() < deadline {
+                let (mut sock, _) = match listener.accept() {
+                    Ok(v) => v,
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                        continue;
+                    }
+                    Err(e) => panic!("backfill-drain mock accept failed: {e}"),
+                };
+                sock.set_nonblocking(false).unwrap();
+                sock.set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                    .unwrap();
+                served += 1;
+                let mut buf = [0u8; 8192];
+                let n = sock.read(&mut buf).unwrap();
+                let req = String::from_utf8_lossy(&buf[..n]).into_owned();
+                let entry = |seq: u64| {
+                    format!(
+                        r#"{{"itemId":"drain-{seq}","seq":{seq},"authorUserId":"anna","rev":1,"generation":1,"createdAt":"2026-07-11T09:00:00Z","tombstoned":false}}"#
+                    )
+                };
+                // The BACKFILL turn re-pulls from just before the stale row's seq and finds nothing
+                // it can match — a real production outcome, and the one that made the drain stop.
+                let body = if req.contains("sinceSeq=2") {
+                    r#"{"items":[],"nextSeq":2}"#.to_string()
+                } else if req.contains("sinceSeq=0") {
+                    live_pages += 1;
+                    let items = (1..=4).map(entry).collect::<Vec<_>>().join(",");
+                    format!(r#"{{"items":[{items}],"nextSeq":4}}"#)
+                } else if req.contains("sinceSeq=4") {
+                    live_pages += 1;
+                    let items = (5..=6).map(entry).collect::<Vec<_>>().join(",");
+                    format!(r#"{{"items":[{items}],"nextSeq":6}}"#)
+                } else {
+                    panic!("unexpected backfill-drain request: {req}")
+                };
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = sock.write_all(resp.as_bytes());
+                let _ = sock.flush();
+                let _ = sock.shutdown(std::net::Shutdown::Write);
+                let mut drain = [0u8; 64];
+                loop {
+                    match sock.read(&mut drain) {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => continue,
+                    }
+                }
+            }
+            live_pages
+        });
+
+        let state = build_state("org-sync-drain-backfill");
+        seed_org(&state.db, "org-drain", "Drain", "member", 1);
+        // A row ingested before author stamping existed: NULL author at seq 3. Its presence is what
+        // makes `org_sync_one` spend an invocation on the backfill turn.
+        state
+            .db
+            .upsert_org_item(
+                "item-stale",
+                "org-drain",
+                3,
+                "anna",
+                "Old note",
+                "# body",
+                "2026-07-11T09:00:00Z",
+                1,
+                1,
+                &[9u8; 32],
+                Some("document"),
+                None,
+                None,
+            )
+            .unwrap();
+        state.config.lock().unwrap().share_base_url = format!("http://{addr}");
+        seed_live_session(&state);
+
+        let report = block_on(org_sync_now_drain_inner(&state, "org-drain")).unwrap();
+        let live_pages = server.join().unwrap();
+
+        assert!(
+            live_pages >= 2,
+            "the drain stopped on the backfill turn: it took {live_pages} live page(s), so it never \
+             reached the items waiting behind it"
+        );
+        assert_eq!(
+            report.pulled, 6,
+            "every live item behind the backfill turn must still be drained"
+        );
+        assert!(
+            !report.more_pending,
+            "the final live page was SHORT, so the feed really is caught up"
+        );
+    }
+
+    /// `drain: Some(false)` must take EXACTLY ONE page, and the frontend must actually ask for it.
+    ///
+    /// The org viewer resolves an edit conflict by syncing purely to learn this org's current head.
+    /// It used to cost one page; once "Sync now" started draining, that same call would have
+    /// inherited the whole backlog and turned a click into a minute of waiting. The one-page mode
+    /// exists for it — and nothing bound either half until now: not "one page", and not the ARGUMENT
+    /// NAME, which is the half this project has already been burned by twice (`rust-tauri.md` §2b,
+    /// `angular-zoneless.md` T6). A frontend that sent `noDrain` instead of `drain` would
+    /// deserialize as `None`, silently take the drain, and leave every gate green.
+    ///
+    /// The mock serves ONE full page and would answer a second; taking it fails the request budget.
+    #[test]
+    fn one_page_mode_takes_exactly_one_page() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(6);
+            let mut served = 0usize;
+            while served < 3 && std::time::Instant::now() < deadline {
+                let (mut sock, _) = match listener.accept() {
+                    Ok(v) => v,
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                        continue;
+                    }
+                    Err(e) => panic!("one-page mock accept failed: {e}"),
+                };
+                sock.set_nonblocking(false).unwrap();
+                sock.set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                    .unwrap();
+                served += 1;
+                let mut buf = [0u8; 8192];
+                let n = sock.read(&mut buf).unwrap();
+                let req = String::from_utf8_lossy(&buf[..n]).into_owned();
+                let entry = |seq: u64| {
+                    format!(
+                        r#"{{"itemId":"page-{seq}","seq":{seq},"authorUserId":"anna","rev":1,"generation":1,"createdAt":"2026-07-11T09:00:00Z","tombstoned":false}}"#
+                    )
+                };
+                let body = if req.contains("sinceSeq=0") {
+                    let items = (1..=4).map(entry).collect::<Vec<_>>().join(",");
+                    format!(r#"{{"items":[{items}],"nextSeq":4}}"#)
+                } else if req.contains("sinceSeq=4") {
+                    let items = (5..=8).map(entry).collect::<Vec<_>>().join(",");
+                    format!(r#"{{"items":[{items}],"nextSeq":8}}"#)
+                } else {
+                    panic!("unexpected one-page request: {req}")
+                };
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = sock.write_all(resp.as_bytes());
+                let _ = sock.flush();
+                let _ = sock.shutdown(std::net::Shutdown::Write);
+                let mut drain = [0u8; 64];
+                loop {
+                    match sock.read(&mut drain) {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => continue,
+                    }
+                }
+            }
+            served
+        });
+
+        let state = build_state("org-sync-one-page");
+        seed_org(&state.db, "org-page", "Page", "member", 1);
+        state.config.lock().unwrap().share_base_url = format!("http://{addr}");
+        seed_live_session(&state);
+
+        let report = block_on(org_sync_now_single_page_inner(&state, "org-page")).unwrap();
+        let served = server.join().unwrap();
+
+        assert_eq!(
+            served, 1,
+            "one-page mode must issue exactly one feed request even when the page comes back FULL"
+        );
+        assert_eq!(report.pulled, 4, "one page's worth, not a drain's");
+        assert_eq!(
+            state.db.get_org_state("org-page").unwrap().unwrap().last_seq,
+            4
+        );
+    }
+
+    /// The `drain` argument the frontend sends must be the one the command declares.
+    ///
+    /// Tauri matches command arguments by NAME. A rename on either side leaves the parameter `None`,
+    /// which means "drain" — so the conflict viewer would quietly go back to paying for the whole
+    /// backlog with nothing failing anywhere. Assert the two spellings against each other rather
+    /// than trusting that they were written on the same day.
+    #[test]
+    fn the_frontend_sends_the_drain_argument_the_command_declares() {
+        let rust = std::fs::read_to_string(
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("src")
+                .join("commands")
+                .join("org.rs"),
+        )
+        .expect("org.rs");
+        assert!(
+            rust.contains("    drain: Option<bool>,"),
+            "org_sync_now no longer declares `drain: Option<bool>` — update both sides deliberately"
+        );
+        let ts = std::fs::read_to_string(
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("repo root")
+                .join("src/app/core/ipc.service.ts"),
+        )
+        .expect("ipc.service.ts");
+        assert!(
+            ts.contains(r#"invoke<OrgSyncReport>("org_sync_now", { orgId, drain })"#),
+            "the frontend no longer sends `drain` to org_sync_now; a mismatched name deserializes \
+             as None, which silently means DRAIN"
+        );
+    }
+
+    /// The catch-up cadence must back off PERMANENTLY against a tick that always reports "changed".
+    ///
+    /// RED→GREEN on my own first version of `org_sync_next_delay_secs`, which reset the counter in
+    /// the same branch that enforced the cap: an always-changing feed then ran 60 fast ticks, one
+    /// slow one, 60 fast ones — roughly one tick every 3.9 s forever, each tick four network phases,
+    /// while the constant's doc claimed the cap prevented exactly that. A range assertion on the
+    /// constants cannot see this; only the emergent duty cycle can.
+    #[test]
+    fn org_sync_catchup_backs_off_permanently_when_a_tick_always_reports_changed() {
+        let mut catching_up = 0u32;
+        let ticks = 500usize;
+        let fast = (0..ticks)
+            .filter(|_| {
+                crate::commands::org_sync_next_delay_secs(true, &mut catching_up)
+                    == crate::commands::ORG_SYNC_CATCHUP_SECS
+            })
+            .count();
+        assert_eq!(
+            fast,
+            crate::commands::ORG_SYNC_MAX_CATCHUP_TICKS as usize,
+            "an always-changing feed took {fast} fast ticks over {ticks}; the cap is \
+             {} and must hold for the rest of the process, not re-arm after one slow tick",
+            crate::commands::ORG_SYNC_MAX_CATCHUP_TICKS
+        );
+
+        // A genuinely QUIET tick is what earns another burst — that is the state the cap is waiting
+        // for, and without it the loop could never catch up on a second backlog.
+        assert_eq!(
+            crate::commands::org_sync_next_delay_secs(false, &mut catching_up),
+            crate::commands::ORG_SYNC_TICK_SECS
+        );
+        assert_eq!(
+            crate::commands::org_sync_next_delay_secs(true, &mut catching_up),
+            crate::commands::ORG_SYNC_CATCHUP_SECS,
+            "a quiet tick must re-arm the catch-up budget"
+        );
+    }
+
+    /// "SYNC NOW" DRAINS THE FEED (RED→GREEN). One invocation used to be exactly ONE bounded
+    /// `ORG_FEED_PAGE` — four items — and the button reported the result as a finished sync. A member
+    /// given a shared Space therefore watched it arrive four objects at a time: the Space row first,
+    /// its folders minutes later, the notes later still, while "Sync now" answered
+    /// "Synced — 4 new items" each press. The page bound is a ceiling on the DECRYPTED PAGE held in
+    /// memory, not a budget for the press, so the drain takes pages SEQUENTIALLY — same ceiling, more
+    /// round trips.
+    ///
+    /// The mock serves six live entries with no `blobId`. That is the TERMINAL-skip path, which
+    /// advances the cursor without needing an OCK, a blob, or an embedder — so this exercises the
+    /// PAGING decision and nothing else. Page one is FULL (4 = `ORG_FEED_PAGE`, "there may be more"),
+    /// page two is SHORT (2, "caught up"), so the drain must stop on its own rather than on its cap.
+    ///
+    /// RED on the pre-fix single-page command: `pulled == 4`, one feed request, and `more_pending`
+    /// absent — a caller told it was up to date while two items were still on the server.
+    #[test]
+    fn manual_org_sync_drains_the_feed_past_one_page() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let addr = listener.local_addr().unwrap();
+        // Bounded at THREE so a regression that loops fails the assertion instead of hanging the suite.
+        let server = std::thread::spawn(move || {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            let mut served = 0usize;
+            while served < 3 && std::time::Instant::now() < deadline {
+                let (mut sock, _) = match listener.accept() {
+                    Ok(v) => v,
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                        continue;
+                    }
+                    Err(e) => panic!("drain mock accept failed: {e}"),
+                };
+                sock.set_nonblocking(false).unwrap();
+                sock.set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                    .unwrap();
+                served += 1;
+                let mut buf = [0u8; 8192];
+                let n = sock.read(&mut buf).unwrap();
+                let req = String::from_utf8_lossy(&buf[..n]).into_owned();
+                // A live entry with NO blobId is terminal-skippable: pulled, recorded, cursor advanced.
+                let entry = |seq: u64| {
+                    format!(
+                        r#"{{"itemId":"drain-{seq}","seq":{seq},"authorUserId":"anna","rev":1,"generation":1,"createdAt":"2026-07-11T09:00:00Z","tombstoned":false}}"#
+                    )
+                };
+                let body = if req.contains("sinceSeq=0") {
+                    let items = (1..=4).map(entry).collect::<Vec<_>>().join(",");
+                    format!(r#"{{"items":[{items}],"nextSeq":4}}"#)
+                } else if req.contains("sinceSeq=4") {
+                    let items = (5..=6).map(entry).collect::<Vec<_>>().join(",");
+                    format!(r#"{{"items":[{items}],"nextSeq":6}}"#)
+                } else {
+                    panic!("unexpected drain feed request: {req}")
+                };
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = sock.write_all(resp.as_bytes());
+                let _ = sock.flush();
+                let _ = sock.shutdown(std::net::Shutdown::Write);
+                let mut drain = [0u8; 64];
+                loop {
+                    match sock.read(&mut drain) {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => continue,
+                    }
+                }
+            }
+            served
+        });
+
+        let state = build_state("org-sync-drain");
+        seed_org(&state.db, "org-drain", "Drain", "member", 1);
+        state.config.lock().unwrap().share_base_url = format!("http://{addr}");
+        seed_live_session(&state);
+
+        // The drain is the shape the button actually runs, so the membership gate is asserted on IT
+        // and not only on the single-page test wrapper — an oracle scoped to one call site is how
+        // this bug lived through five days of green suites in the first place.
+        assert!(
+            matches!(
+                block_on(org_sync_now_drain_inner(&state, "org-not-joined")),
+                Err(AppError::InvalidArg(_))
+            ),
+            "the drain must refuse an org the caller is not a local member of, before any socket"
+        );
+
+        let report = block_on(org_sync_now_drain_inner(&state, "org-drain")).unwrap();
+        let served = server.join().unwrap();
+
+        assert_eq!(
+            served, 2,
+            "one press must take a SECOND page after a full first one (RED: 1 request)"
+        );
+        assert_eq!(
+            report.pulled, 6,
+            "the drain must report every item it consumed, not one page's worth (RED: 4)"
+        );
+        assert_eq!(report.errors.len(), 6, "each blob-less entry is recorded");
+        assert!(
+            !report.more_pending,
+            "a SHORT final page means the feed is caught up — claiming otherwise is the mirror of \
+             the bug this fixes"
+        );
+        assert_eq!(
+            state
+                .db
+                .get_org_state("org-drain")
+                .unwrap()
+                .unwrap()
+                .last_seq,
+            6,
+            "the durable cursor must reflect every drained page"
+        );
+    }
+
     /// F1 (MULTI-ORG TARGETING, RED→GREEN for the `.next()` misroute): with TWO local orgs, the org
     /// commands must resolve the SPECIFIC org the FE passed, never the FIRST. `resolve_org` — the
     /// shared resolution seam every per-org command now uses — must return the SECOND org's row when

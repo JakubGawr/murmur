@@ -533,6 +533,51 @@ pub const EVENT_ORG_FEED_UPDATED: &str = "murmur://org-feed-updated";
 /// a whole Space is N sequential round-trips and a spinner cannot say how far it got.
 pub const EVENT_CONTAINER_SHARE_PROGRESS: &str = "murmur://container-share-progress";
 
+/// Progress of ONE user-triggered "Sync now". Counts and a stage name only, NO PII (no org name,
+/// item id, or title — the org id is a server-issued opaque id the FE already holds).
+///
+/// A manual sync is several bounded feed pages followed by a container reconcile that can publish or
+/// withdraw many documents, all sequential network round trips. Without this the button is an
+/// indeterminate "Syncing…" for the whole thing, which is what a user reported as "it keeps syncing
+/// and you don't know the status" — a spinner cannot distinguish working from wedged.
+pub const EVENT_ORG_SYNC_PROGRESS: &str = "murmur://org-sync-progress";
+
+/// Payload for [`EVENT_ORG_SYNC_PROGRESS`].
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrgSyncProgressPayload {
+    /// The org being synced, so a stale event from a previous press is dropped rather than shown.
+    pub org_id: String,
+    /// `"feed"` while draining bounded feed pages, `"containers"` while reconciling shared folders.
+    pub stage: &'static str,
+    /// Feed items consumed so far this press.
+    pub pulled: u32,
+    /// Feed items ingested into the local replica so far this press.
+    pub ingested: u32,
+}
+
+/// Emit [`EVENT_ORG_SYNC_PROGRESS`] (best-effort). A failed emit only costs the button a label
+/// update; it must never affect the sync itself.
+pub fn emit_org_sync_progress(
+    app: &AppHandle,
+    org_id: &str,
+    stage: &'static str,
+    pulled: u32,
+    ingested: u32,
+) {
+    if let Err(e) = app.emit(
+        EVENT_ORG_SYNC_PROGRESS,
+        OrgSyncProgressPayload {
+            org_id: org_id.to_string(),
+            stage,
+            pulled,
+            ingested,
+        },
+    ) {
+        tracing::warn!(target: "org", error = %e, "failed to emit org-sync progress");
+    }
+}
+
 /// Payload for [`EVENT_CONTAINER_SHARE_PROGRESS`]. Two counts only — NO PII.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -892,6 +937,29 @@ mod tests {
     #[test]
     fn org_sync_tick_cadence_is_one_minute() {
         assert_eq!(crate::commands::ORG_SYNC_TICK_SECS, 60);
+    }
+
+    /// The FE reads these keys off the progress event; a snake_case field is `undefined` on arrival
+    /// and the button silently keeps its static label (`rust-tauri.md` §2b).
+    #[test]
+    fn org_sync_progress_payload_is_camel_case() {
+        let json = serde_json::to_string(&OrgSyncProgressPayload {
+            org_id: "org-1".into(),
+            stage: "feed",
+            pulled: 8,
+            ingested: 6,
+        })
+        .unwrap();
+        assert_eq!(
+            json,
+            r#"{"orgId":"org-1","stage":"feed","pulled":8,"ingested":6}"#
+        );
+    }
+
+    /// The FE listens on this exact event name; a rename silently drops the sync-progress label.
+    #[test]
+    fn org_sync_progress_event_name_is_stable() {
+        assert_eq!(EVENT_ORG_SYNC_PROGRESS, "murmur://org-sync-progress");
     }
 
     /// The FE listens on this exact event name; a rename silently drops the import progress bar.

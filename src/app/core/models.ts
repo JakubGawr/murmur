@@ -3345,6 +3345,19 @@ export interface OrgSourceRef {
  * the org partition is FTS-only until a model appears + a re-embed runs).
  * Mirrors the Rust `OrgSyncReport`.
  */
+/**
+ * Payload of `murmur://org-sync-progress` (`onOrgSyncProgress`) — what the "Sync now" press in
+ * flight has done so far. Counts and a stage name only; the org id is the same opaque server id the
+ * FE already holds, so a listener can drop an event from a previous press.
+ */
+export interface OrgSyncProgress {
+  orgId: string;
+  /** `"feed"` while bounded feed pages drain; `"containers"` while shared folders reconcile. */
+  stage: "feed" | "containers";
+  pulled: number;
+  ingested: number;
+}
+
 export interface OrgSyncReport {
   pulled: number;
   ingested: number;
@@ -3353,6 +3366,13 @@ export interface OrgSyncReport {
   /** No real embedder → org partition indexed FTS-only (re-embed when a model lands). */
   ftsOnly: boolean;
   errors: string[];
+  /**
+   * The drain stopped on its OWN bound (page cap, deadline, or a busy mutation lock), not because
+   * the feed ran out — so the org is still behind and the background loop is still catching up.
+   * Without this a capped sync is indistinguishable from a completed one, and the panel says
+   * "Synced — up to date." about an org that demonstrably is not.
+   */
+  morePending: boolean;
 }
 
 /**

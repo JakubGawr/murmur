@@ -449,6 +449,27 @@ mod org_mutex_reentrancy {
         );
     }
 
+    /// Record a BOUNDED acquisition without asserting on it, returning whether this holder was
+    /// newly recorded (only then may its guard remove the id on drop).
+    ///
+    /// Asymmetric on purpose, and the asymmetry is the whole point. A bounded ATTEMPT cannot hang —
+    /// if the caller already holds the lock the timeout simply elapses — so asserting on entry here
+    /// would be the guard mistaking a refusal-by-design for a deadlock. But a bounded guard that is
+    /// HELD across a callee taking the unbounded door hangs exactly like any other re-entrancy, and
+    /// until this existed the bookkeeping could not see it: the outer holder was never recorded, so
+    /// the inner `enter()` found an empty set and the process wedged in silence.
+    ///
+    /// That is not hypothetical. The change that fixed the `org_sync_now` deadlock moved both of the
+    /// "Sync now" paths onto this bounded door, and so out from under the only check that was
+    /// watching them.
+    pub(super) fn enter_bounded() -> bool {
+        let id = holder_id();
+        let mut set = holders()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        set.insert(id)
+    }
+
     pub(super) fn leave() {
         let id = holder_id();
         let mut set = holders()
@@ -467,8 +488,9 @@ mod org_mutex_reentrancy {
 pub struct OrgMutationGuard<'a> {
     _inner: tokio::sync::MutexGuard<'a, ()>,
     /// Whether this guard registered itself with the re-entrancy bookkeeping, so only guards that
-    /// entered ever leave. A bounded acquisition never enters, and must not remove an id the
-    /// unbounded holder on the same thread put there.
+    /// registered ever unregister. BOTH doors register on SUCCESS now; the flag exists because
+    /// `insert` can legitimately report "already present" and a guard must never remove an id it
+    /// did not put there.
     #[cfg(debug_assertions)]
     checked: bool,
 }
@@ -499,14 +521,19 @@ impl AppState {
 
     /// Acquire it, or give up after `wait`.
     ///
-    /// DELIBERATELY NOT re-entrancy-checked, and the distinction is the whole point: a BOUNDED
-    /// attempt cannot deadlock. If the caller already holds the lock the timeout simply elapses and
-    /// the caller is told the resource is busy — which is a correct, recoverable outcome, and one
-    /// the suite asserts on purpose in
+    /// It does not ASSERT on entry, and the distinction is the whole point: a BOUNDED attempt
+    /// cannot deadlock. If the caller already holds the lock the timeout simply elapses and the
+    /// caller is told the resource is busy — a correct, recoverable outcome, and one the suite
+    /// asserts on purpose in
     /// `org_diagnosability_tests::a_held_share_mutation_lock_yields_busy_rather_than_hanging`.
-    ///
     /// Panicking there would have been the guard mistaking "an attempt designed to be refused" for
     /// "a hang", which is exactly the false positive that gets a check deleted rather than fixed.
+    ///
+    /// It DOES register the holder on success, which it did not used to. A bounded guard is still a
+    /// held guard: a callee that takes the unbounded door underneath one waits forever exactly like
+    /// any other re-entrancy, and with no registration the inner `enter()` saw an empty set and the
+    /// process wedged in silence. Registering here is what lets that inner acquisition panic
+    /// instead — and it costs nothing at the bounded call site, which never asserts.
     pub(crate) async fn lock_org_mutation_within(
         &self,
         wait: std::time::Duration,
@@ -517,7 +544,7 @@ impl AppState {
             .map(|inner| OrgMutationGuard {
                 _inner: inner,
                 #[cfg(debug_assertions)]
-                checked: false,
+                checked: org_mutex_reentrancy::enter_bounded(),
             })
     }
 }

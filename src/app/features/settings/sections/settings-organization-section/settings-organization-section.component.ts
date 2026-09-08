@@ -14,9 +14,11 @@ import type {
   OrgItemHeader,
   OrgMember,
   OrgStatus,
+  OrgSyncProgress,
 } from "../../../../core/models";
 import { ErrorCopyService } from "../../../../core/copy/error-copy.service";
 import { DateFormatService } from "../../../../core/date-format.service";
+import { OrgRosterStore } from "../../../../services/org-roster.store";
 
 /**
  * Settings → Organization section (Shared Brain v1, MULTI-ORG).
@@ -58,13 +60,25 @@ export class SettingsOrganizationSectionComponent {
   private readonly toast = inject(ToastService);
   private readonly errorCopy = inject(ErrorCopyService);
 
-  /** Every org the user belongs to (created OR invited-into). Empty ⇒ empty state. */
-  private readonly _orgs = signal<OrgStatus[]>([]);
+  /**
+   * Every org the user belongs to (created OR invited-into), held in a ROOT store so the rows
+   * survive this section's destroy+recreate and a failed refresh never blanks them
+   * ({@link OrgRosterStore} carries the full rationale).
+   */
+  private readonly roster = inject(OrgRosterStore);
+  private readonly _orgs = this.roster.orgs;
   readonly orgs = this._orgs.asReadonly();
 
-  /** True until the first list load resolves (avoids an empty-state flash). */
-  private readonly _loaded = signal(false);
+  /** True once a roster read has settled at least once (avoids an empty-state flash). */
+  private readonly _loaded = this.roster.loaded;
   readonly loaded = this._loaded.asReadonly();
+
+  /**
+   * The last roster read failed. The list keeps its last-known rows; the template says so instead
+   * of rendering the "you're not in any organization yet" copy at somebody who is.
+   */
+  private readonly _loadFailed = this.roster.loadFailed;
+  readonly loadFailed = this._loadFailed.asReadonly();
 
   /** A general org error (list load / mutate failure). */
   private readonly _error = signal<string | null>(null);
@@ -83,7 +97,7 @@ export class SettingsOrganizationSectionComponent {
   readonly email = this._email.asReadonly();
 
   /** True while at least one org is present. */
-  readonly hasOrgs = computed(() => this._orgs().length > 0);
+  readonly hasOrgs = this.roster.hasOrgs;
 
   /** True while the global org-egress consent is granted (any org's flag ⇒ global grant). */
   private readonly _consented = signal(false);
@@ -91,10 +105,27 @@ export class SettingsOrganizationSectionComponent {
   readonly consentBusy = signal(false);
 
   // ── Reload trigger + stale-result guard ─────────────────────────────────────
+  //
+  // The load TOKEN lives in the root store, not here: the signals it guards are shared, so a
+  // per-instance token stops guarding anything the moment a destroyed section's response lands on
+  // a live one's data. See {@link OrgRosterStore.beginLoad}.
   /** Bump to re-run the load effect (open, after create/leave/invite). */
   private readonly _reloadTick = signal(0);
-  /** Monotonic load token — a resolved fetch writes only if it is still the latest. */
-  private _loadSeq = 0;
+  /**
+   * COALESCE live-refresh bursts. A reload here is a real network round trip per org
+   * (`org_refresh`, then `org_status` + `org_list_members` for each), and `org-feed-updated` now
+   * arrives every few seconds while the background loop is catching a backlog up rather than once a
+   * minute. Without this, each ping would start another overlapping fan-out on top of the one still
+   * in flight. At most ONE follow-up is queued: the reason to reload is "something changed", and one
+   * reload after the current one observes every change that landed while it ran.
+   *
+   * The flag is released by the NEWEST run's `finally` (a superseded run deliberately does not touch
+   * it, or a slow stale response would free a slot its successor owns). That makes an unsettled
+   * newest request the one way to stall live refresh — bounded, because every command on this path
+   * is bounded backend-side, and a user action calls {@link reload} directly regardless.
+   */
+  private _reloadInFlight = false;
+  private _reloadQueued = false;
 
   // ── Create form ─────────────────────────────────────────────────────────────
   readonly createName = signal("");
@@ -127,6 +158,29 @@ export class SettingsOrganizationSectionComponent {
   /** The org id currently syncing (locks its Sync now button). */
   private readonly _syncingOrgId = signal<string | null>(null);
   readonly syncingOrgId = this._syncingOrgId.asReadonly();
+  /**
+   * What the sync in flight has done so far, straight off `murmur://org-sync-progress`.
+   *
+   * A manual sync is several bounded feed pages and then a container reconcile — sequential network
+   * round trips that can take a while on a real backlog. A label that never changes is
+   * indistinguishable from a wedge, which is how this was reported: "it keeps syncing and you don't
+   * know the status". `null` between presses.
+   */
+  private readonly _syncProgress = signal<OrgSyncProgress | null>(null);
+
+  /**
+   * The live label for the ONE org that can be syncing at a time. Derived, not recomputed per row:
+   * the template picks it only for the row whose id matches {@link syncingOrgId}.
+   */
+  readonly syncLabel = computed<string>(() => {
+    const progress = this._syncProgress();
+    if (!progress || progress.orgId !== this._syncingOrgId()) {
+      return "Syncing…";
+    }
+    return progress.stage === "containers"
+      ? "Syncing folders…"
+      : `Syncing… ${progress.pulled}`;
+  });
 
   // ── Browse the shared brain (fix A) — per-org item list ──────────────────────
   /** The org id whose "Shared brain" browse list is expanded (one at a time). */
@@ -146,6 +200,8 @@ export class SettingsOrganizationSectionComponent {
   private readonly destroyRef = inject(DestroyRef);
   /** Released on destroy to detach the org-feed-updated live-refresh listener. */
   private orgFeedUnlisten: (() => void) | null = null;
+  /** Released on destroy to detach the org-sync-progress listener. */
+  private syncProgressUnlisten: (() => void) | null = null;
   /** True once destroyed — so a `listen()` that resolves AFTER teardown releases immediately
    * (distinct from `orgFeedUnlisten === null`, which also means "not yet resolved"). */
   private orgFeedDestroyed = false;
@@ -156,13 +212,14 @@ export class SettingsOrganizationSectionComponent {
     // invite can re-run it; a stale-result guard drops a superseded response.
     effect(() => {
       this._reloadTick(); // dependency: any bump re-runs the load
-      const seq = ++this._loadSeq;
+      const seq = this.roster.beginLoad();
       this._error.set(null);
+      this._reloadInFlight = true;
       void (async () => {
         // Account email (best-effort — a logged-out user still sees the section).
         try {
           const acct = await this.ipc.accountStatus();
-          if (seq === this._loadSeq) {
+          if (this.roster.isCurrentLoad(seq)) {
             this._email.set(acct.email);
           }
         } catch {
@@ -177,19 +234,29 @@ export class SettingsOrganizationSectionComponent {
         }
         try {
           const list = await this.ipc.orgListStatuses();
-          if (seq !== this._loadSeq) {
+          if (!this.roster.isCurrentLoad(seq)) {
             return; // a newer reload superseded this one — drop the result
           }
+          this._loadFailed.set(false);
           this._orgs.set(list);
           this._consented.set(list.some((o) => o.consented));
           this.reconcileExpanded(list);
         } catch (e) {
-          if (seq === this._loadSeq) {
+          if (this.roster.isCurrentLoad(seq)) {
+            // Record the failure; do NOT clear the rows. A read that could not reach the relay
+            // rendered as "You're not in any organization yet" — the app telling a member of three
+            // orgs that they belong to none, with no retry but closing and reopening the section.
+            this._loadFailed.set(true);
             this._error.set(this.errorCopy.humanize(e));
           }
         } finally {
-          if (seq === this._loadSeq) {
+          if (this.roster.isCurrentLoad(seq)) {
             this._loaded.set(true);
+            this._reloadInFlight = false;
+            if (this._reloadQueued) {
+              this._reloadQueued = false;
+              this.reload();
+            }
           }
         }
       })();
@@ -203,10 +270,36 @@ export class SettingsOrganizationSectionComponent {
       this.orgFeedDestroyed = true;
       this.orgFeedUnlisten?.();
       this.orgFeedUnlisten = null;
+      this.syncProgressUnlisten?.();
+      this.syncProgressUnlisten = null;
     });
     void this.ipc
+      .onOrgSyncProgress((progress) => {
+        // Drop an event from a press that is already over, or from another org's press.
+        //
+        // KNOWN BOUND: a trailing event from press N, delivered after press N+1 has started on the
+        // SAME org, is accepted and shows press N's counts until press N+1's first event replaces
+        // them. Distinguishing them needs a correlation id echoed through the command, and the
+        // symptom — a count that reads high for one page before correcting — is not worth widening
+        // the IPC surface for. The window is small because the backend emits every progress event
+        // before the command it belongs to resolves, and the button stays disabled until it does.
+        if (this._syncingOrgId() === progress.orgId) {
+          this._syncProgress.set(progress);
+        }
+      })
+      .then((un) => {
+        if (this.orgFeedDestroyed) {
+          un();
+        } else {
+          this.syncProgressUnlisten = un;
+        }
+      })
+      .catch(() => {
+        /* best-effort: no Tauri host (e.g. plain browser) → no live progress */
+      });
+    void this.ipc
       .onOrgFeedUpdated(() => {
-        this.reload();
+        this.requestReload();
         // Keep an open browse list fresh too (the reload only refreshes the org cards/counts).
         const open = this._browseOrgId();
         if (open !== null) {
@@ -229,6 +322,19 @@ export class SettingsOrganizationSectionComponent {
   /** Re-run the load effect (server discovery + list). */
   private reload(): void {
     this._reloadTick.update((n) => n + 1);
+  }
+
+  /**
+   * Reload for a LIVE-REFRESH ping, coalescing a burst into at most one follow-up. A user action
+   * (create / leave / invite / sync) still calls {@link reload} directly — that one must not be
+   * folded into somebody else's in-flight fetch.
+   */
+  private requestReload(): void {
+    if (this._reloadInFlight) {
+      this._reloadQueued = true;
+      return;
+    }
+    this.reload();
   }
 
   /** Drop the expanded member manager / browse list if their org is gone. */
@@ -457,10 +563,16 @@ export class SettingsOrganizationSectionComponent {
       return;
     }
     this._syncingOrgId.set(org.orgId);
+    this._syncProgress.set(null);
     this._error.set(null);
     try {
       const report = await this.ipc.orgSyncNow(org.orgId);
       const stalled = report.pulled > 0 && report.ingested === 0;
+      // A drain that stopped on its OWN bound (page cap / deadline / a busy lock) has NOT caught
+      // up. Saying "up to date" there is the same lie the single-page sync used to tell.
+      const tail = report.morePending
+        ? " More is still arriving in the background."
+        : "";
       if (report.errors.length > 0 || stalled) {
         // Name the FIRST real error rather than always guessing "a key may not be granted yet".
         // The report now also carries shared-folder publish failures, which that guess describes
@@ -469,14 +581,16 @@ export class SettingsOrganizationSectionComponent {
         this.toast.danger(
           `${report.pulled} pulled, ${report.ingested} ingested, ` +
             `${report.errors.length} error${report.errors.length === 1 ? "" : "s"} — ` +
-            `${detail}.`,
+            `${detail}.${tail}`,
         );
-      } else {
+      } else if (report.ingested > 0) {
         this.toast.success(
-          report.ingested > 0
-            ? `Synced — ${report.ingested} new item${report.ingested === 1 ? "" : "s"}.`
-            : "Synced — up to date.",
+          `Synced — ${report.ingested} new item${report.ingested === 1 ? "" : "s"}.${tail}`,
         );
+      } else if (report.morePending) {
+        this.toast.success("Synced — still catching up in the background.");
+      } else {
+        this.toast.success("Synced — up to date.");
       }
       this.reload();
       // Keep an open browse list fresh after a sync brings in new items.
@@ -488,6 +602,7 @@ export class SettingsOrganizationSectionComponent {
       this.toast.danger(this.errorCopy.because("Sync failed", e));
     } finally {
       this._syncingOrgId.set(null);
+      this._syncProgress.set(null);
     }
   }
 

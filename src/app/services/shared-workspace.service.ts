@@ -104,6 +104,21 @@ export class SharedWorkspaceService {
   private loadSeq = 0;
   private feedUnlisten: (() => void) | null = null;
   private feedDestroyed = false;
+  /**
+   * Re-read the received forest when the window comes back to the front.
+   *
+   * Every read here is LOCAL — `list_shared_workspace` touches `org_*` tables only and makes no
+   * network call — so this is not an egress event, it is the same three SQLite reads the sidebar
+   * already does. It exists because the backend's `org-feed-updated` ping is the only other thing
+   * that refreshes this tree, and that ping fires only when a background tick actually CHANGED the
+   * replica. Anything that changed the replica while this window was in the background and did not
+   * ping (or pinged before the listener resolved) left the sidebar showing what it read at launch
+   * until the app was restarted. {@link OrgBrainService} already refreshes on focus for exactly
+   * this reason; the sidebar had no such recovery.
+   */
+  private readonly onWindowFocus = (): void => {
+    void this.load();
+  };
 
   constructor() {
     // A workspace mutation can change what a shared container HOLDS — a note
@@ -116,11 +131,13 @@ export class SharedWorkspaceService {
         void this.syncAfterWorkspaceMutation();
       }
     });
+    window.addEventListener("focus", this.onWindowFocus);
     this.destroyRef.onDestroy(() => {
       // A root service is never actually destroyed in practice; honor the
       // contract in case a test harness tears it down.
       this.feedDestroyed = true;
       this.feedUnlisten?.();
+      window.removeEventListener("focus", this.onWindowFocus);
     });
     void this.ipc
       .onOrgFeedUpdated(() => void this.load())
