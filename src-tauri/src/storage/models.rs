@@ -858,7 +858,8 @@ pub struct OrgOwnedSource {
 /// Shared Brain v1 — the content-free result of a manual `org_sync_now()` (counts + errors only).
 /// `fts_only` is true when the local member has no real embedder (StubEmbedder ⇒ the org partition
 /// is indexed FTS-only until a model appears + a re-embed runs). Mirrors the FE `OrgSyncReport`
-/// (camelCase: `pulled, ingested, tombstoned, lastSeq, ftsOnly, errors, authorsBackfilled`).
+/// (camelCase: `pulled, ingested, tombstoned, lastSeq, ftsOnly, errors, authorsBackfilled,
+/// morePending`) — asserted by `org_sync_report_wire_shape_is_camel_case`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OrgSyncReport {
@@ -874,6 +875,15 @@ pub struct OrgSyncReport {
     /// full-feed re-pull (`org_sync_one` → the null-author backfill pass). Content-free — an id/author
     /// count only. (2026-07-15.)
     pub authors_backfilled: u32,
+    /// The drain stopped on ITS OWN bound (page cap, deadline, or a busy mutation lock) rather than
+    /// because the feed ran out — so more items are still waiting on the server.
+    ///
+    /// This exists because the alternative is a lie. A manual sync takes bounded pages, and without
+    /// this flag a capped drain returns the same shape as a completed one, which the panel renders
+    /// as "Synced — up to date." while the org is demonstrably behind. Content-free: one bool.
+    /// (2026-09-08.)
+    #[serde(default)]
+    pub more_pending: bool,
 }
 
 /// A standalone authored note — the LIST-row DTO (leak-free: no body for a sealed note). A note is a

@@ -105,6 +105,32 @@ async fn a_held_share_mutation_lock_yields_busy_rather_than_hanging() {
     drop(held);
 }
 
+/// A BOUNDED guard held across a nested UNBOUNDED acquisition must panic, not hang.
+///
+/// The bounded door used not to register its holder, on the reasoning that a bounded ATTEMPT cannot
+/// deadlock — true, and the wrong half of the problem. A bounded guard that is HELD while a callee
+/// takes the unbounded door wedges exactly like any other re-entrancy, and with no registration the
+/// inner `enter()` found an empty set, asserted nothing, and the process stopped doing org work in
+/// silence. That mattered the moment the "Sync now" fix moved both of its paths onto this door: they
+/// left the only check that was watching them.
+///
+/// RED CONTROL (run 2026-09-08, observed): with `enter_bounded` reverted to not registering, this
+/// test does not fail — it HANGS, and takes the test binary with it until it is killed. That is the
+/// finding, not a flaw in the control: the defect being fixed is a wait that never returns, so its
+/// RED is a hang. It is also why this oracle earns its keep in a way a source-level check could not.
+#[cfg(debug_assertions)]
+#[tokio::test]
+#[should_panic(expected = "acquired re-entrantly")]
+async fn a_bounded_guard_makes_a_nested_unbounded_acquisition_panic_instead_of_hanging() {
+    let state = AppState::for_tests(fresh_db("bounded-reentrancy"));
+    let _outer = acquire_share_mutation_within(&state, std::time::Duration::from_millis(50))
+        .await
+        .expect("an uncontended lock must be acquired");
+    // In release this would wait forever and hold the mutex for the rest of the process. The
+    // bookkeeping turns it into a loud, immediately investigable panic BEFORE the await.
+    let _inner = state.lock_org_mutation().await;
+}
+
 /// A free lock is still acquired normally — the bound must not break the happy path.
 #[tokio::test]
 async fn a_free_share_mutation_lock_is_acquired() {

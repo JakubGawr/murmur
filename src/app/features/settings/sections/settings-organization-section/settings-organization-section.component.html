@@ -22,9 +22,18 @@
       </div>
     </div>
 
-    @if (!loaded()) {
+    <!-- The spinner is gated on "nothing to show YET", never on "a read is in flight": a return
+         visit renders the last-known rows from the root roster store while the reload runs
+         underneath (angular-zoneless.md §8). -->
+    @if (!loaded() && !hasOrgs()) {
       <p class="text-muted account-note">Loading organizations…</p>
     } @else {
+      @if (loadFailed() && hasOrgs()) {
+        <p class="text-muted account-note" role="status">
+          Couldn't refresh your organizations just now — showing the last known
+          state.
+        </p>
+      }
       <!-- ── Your organizations ── -->
       @if (hasOrgs()) {
         <div class="account-section">
@@ -116,13 +125,16 @@
                       {{ expandedOrgId() === o.orgId ? "Hide members" : "Invite & members" }}
                     </button>
                   }
+                  <!-- The label carries the LIVE stage + count while this org is syncing: a
+                       manual sync is several sequential round trips, and a static "Syncing…" cannot
+                       be told apart from a wedge. -->
                   <button
                     type="button"
                     class="btn btn-ghost mini-btn"
                     (click)="syncNow(o)"
                     [disabled]="syncingOrgId() !== null"
                   >
-                    {{ syncingOrgId() === o.orgId ? "Syncing…" : "Sync now" }}
+                    {{ syncingOrgId() === o.orgId ? syncLabel() : "Sync now" }}
                   </button>
                   <button
                     type="button"
@@ -273,8 +285,18 @@
             }
           </div>
         </div>
+      } @else if (loadFailed()) {
+        <!-- A read that FAILED is not evidence of an empty membership. Telling somebody they are in
+             no organization because the relay was unreachable is the bug this branch exists to
+             prevent — the error line below carries the reason. -->
+        <div class="account-section">
+          <p class="text-secondary account-note org-empty">
+            Couldn't read your organizations. Nothing has been changed — try
+            again in a moment.
+          </p>
+        </div>
       } @else {
-        <!-- ── Empty state: in no org ── -->
+        <!-- ── Empty state: in no org (a read that SUCCEEDED and found none) ── -->
         <div class="account-section">
           <p class="text-secondary account-note org-empty">
             You're not in any organization yet — create one, or ask a teammate to

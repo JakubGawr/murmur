@@ -539,7 +539,9 @@ export class OrgItemViewerComponent {
     this.openingLatest.set(true);
     this._openLatestFailed.set(false);
     try {
-      await this.ipc.orgSyncNow(orgId);
+      // One page, not a drain: this needs THIS item's current head, and the user is waiting on a
+      // click. Catching the whole org up is the Sync-now button's job and the background loop's.
+      await this.ipc.orgSyncNow(orgId, false);
       const latest = await this.ipc.orgGetItem(linkId);
       if (this.itemId() !== routeId || this._item() !== conflicted) {
         return;

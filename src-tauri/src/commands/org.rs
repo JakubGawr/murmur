@@ -3260,6 +3260,13 @@ async fn org_reconcile_memberships_with_policy(
         return Ok(());
     }
     let client = crate::share::client::ShareClient::new(&base)?;
+    // Every cloud call this app makes is visible in the egress ledger, and this one was not. It is
+    // content-free — a bearer and the account's membership metadata, never a title or a note byte —
+    // but "content-free" is not the ledger's admission criterion; leaving a route off it makes the
+    // ledger an incomplete picture of what the app talks to, which is the one thing it exists to
+    // rule out. It now also fires from `unlock_sharing_with_biometric`, which had no network calls
+    // at all before, so an unrecorded route there is a new blind spot rather than an old one.
+    crate::share::ledger_row(&state.db, &client.host(), "org_membership_refresh", 0);
     // A pull failure (network/5xx) is best-effort: keep the cached rows, retry next tick.
     let mut server_orgs = match client.org_list(&access).await {
         Ok(o) => o,
@@ -9504,6 +9511,66 @@ pub(crate) async fn revoke_org_shares_for_source_notifying(
 pub const ORG_SYNC_FIRST_DELAY_SECS: u64 = 20;
 pub const ORG_SYNC_TICK_SECS: u64 = 60;
 
+/// Cadence for the NEXT tick while the loop is still CATCHING UP.
+///
+/// A tick that actually changed the local replica is evidence that the feed had a backlog, and a
+/// backlog drains one bounded [`ORG_FEED_PAGE`] per tick. At the flat 60 s cadence that is four
+/// objects a minute: a colleague sharing a Space of thirty notes appeared on the member's machine as
+/// the Space row, then its folders several minutes later, then the notes later still — which reads
+/// as a broken sync rather than a slow one. Backing off only once the replica has stopped changing
+/// keeps the steady-state cost identical (a quiet feed still ticks once a minute) while a real
+/// backlog lands in seconds.
+pub const ORG_SYNC_CATCHUP_SECS: u64 = 3;
+
+/// How many consecutive catch-up-cadence ticks the loop may take before returning to
+/// [`ORG_SYNC_TICK_SECS`] regardless. A tick that reports "changed" forever — a feed row that
+/// re-ingests every pass, a sweep that never converges — must not become a 3 s poll for the life of
+/// the process. At [`ORG_FEED_PAGE`] per tick this still covers a several-hundred-object backlog
+/// before the loop pauses for breath, and the next normal tick simply resumes catching up.
+pub const ORG_SYNC_MAX_CATCHUP_TICKS: u32 = 60;
+
+/// How long the background loop should sleep after one tick, given whether that tick CHANGED the
+/// local replica, advancing the caller's consecutive-catch-up counter.
+///
+/// Extracted from the loop in `lib.rs` because the property that matters is not the constant, it is
+/// the emergent DUTY CYCLE — and the first version of this got that wrong in a way no constant-range
+/// assertion could see. It reset the counter in the same branch that enforced the cap, so a tick that
+/// always reported "changed" settled into 60 fast ticks, one slow one, 60 fast ones… — about one tick
+/// every 3.9 s forever, when the cap exists precisely to stop a permanent fast poll. Resetting only
+/// on a QUIET tick is what makes the cap a cap. See
+/// `org_sync_catchup_backs_off_permanently_when_a_tick_always_reports_changed`.
+pub(crate) fn org_sync_next_delay_secs(changed: bool, catching_up: &mut u32) -> u64 {
+    if !changed {
+        *catching_up = 0;
+        return ORG_SYNC_TICK_SECS;
+    }
+    if *catching_up < ORG_SYNC_MAX_CATCHUP_TICKS {
+        *catching_up += 1;
+        return ORG_SYNC_CATCHUP_SECS;
+    }
+    // Capped: stay at the idle cadence and DO NOT reset — only a genuinely quiet tick earns another
+    // catch-up burst.
+    ORG_SYNC_TICK_SECS
+}
+
+/// The catch-up cadence's invariants, checked at COMPILE time rather than by a test: they are
+/// relations between three constants, so there is nothing to run — a violating edit should not
+/// build, not merely fail a suite somebody can skip.
+const _: () = {
+    assert!(
+        ORG_SYNC_CATCHUP_SECS >= 1,
+        "a zero catch-up sleep is a busy loop, not a cadence"
+    );
+    assert!(
+        ORG_SYNC_CATCHUP_SECS * 4 < ORG_SYNC_TICK_SECS,
+        "a catch-up tick that is not materially faster than the idle one is not a catch-up"
+    );
+    assert!(
+        ORG_SYNC_MAX_CATCHUP_TICKS >= 1 && ORG_SYNC_MAX_CATCHUP_TICKS <= 200,
+        "the fast cadence must be capped — a feed that always reports 'changed' must not poll forever"
+    );
+};
+
 /// One background org-sync tick: advance at most one outbound queue action, then pull + ingest one
 /// bounded inbound-feed page for one round-robin org into the local int8 partition. This is what
 /// makes the org brain a REPLICATED brain — every
@@ -10228,7 +10295,7 @@ async fn org_sweep_pending_with_policy(
     Ok(advanced)
 }
 
-/// `org_sync_now(org_id?)` — pull one bounded org-feed page, OPEN each ciphertext blob
+/// `org_sync_now(org_id?)` — pull the org feed in bounded pages, OPEN each ciphertext blob
 /// with the (RAM-cached / grant-unwrapped) OCK, and INGEST it into the local decrypted replica + int8
 /// retrieval partition. A TOMBSTONE evicts the item's chunks/vectors/FTS. Returns a content-free
 /// [`OrgSyncReport`] (counts + `fts_only` + per-item error strings). Best-effort per item: a single
@@ -10236,34 +10303,87 @@ async fn org_sweep_pending_with_policy(
 /// crashing the whole sync — the cursor still advances past a tombstone but STOPS at the first
 /// un-openable LIVE item so a transient key gap is retried next sync (no silent skip-forward).
 ///
-/// `org_id`: `Some(id)` syncs ONLY that (FE-picked, membership-checked) org; `None` selects one joined
-/// org per call by process-local round-robin. This makes the page/RAM bound global to the invocation,
-/// while the normal background cadence still services every joined org fairly.
+/// `drain`: `Some(false)` takes exactly ONE page for a caller that only needs this org's current
+/// head (the org viewer resolving an edit conflict). Anything else drains — that is what the "Sync
+/// now" button means.
+///
+/// `org_id`: `Some(id)` syncs ONLY that (FE-picked, membership-checked) org and DRAINS it —
+/// [`ORG_MANUAL_SYNC_MAX_PAGES`] bounded pages, or until the feed runs out or
+/// [`ORG_MANUAL_SYNC_DEADLINE`] elapses, whichever comes first. `None` selects one joined org per
+/// call by process-local round-robin and takes a single page, because that path is the untargeted /
+/// internal one and the background cadence services every joined org fairly.
+///
+/// WHY THE DRAIN (2026-09-08). One invocation used to be exactly ONE [`ORG_FEED_PAGE`] — four items.
+/// A member who had just been given a shared Space watched it materialize four objects at a time, a
+/// minute apart: the Space row first, its folders several minutes later, the notes later still.
+/// Pressing "Sync now" advanced it by four and reported "Synced — 4 new items", which reads as
+/// finished. The page bound exists to cap the DECRYPTED PAGE held in memory at once, and draining
+/// sequentially page-by-page keeps that ceiling exactly where it was; only the number of round trips
+/// per press changes. `more_pending` tells the caller the CAP — not the feed — ended the drain, so
+/// the UI can say so instead of claiming the org is up to date.
+///
+/// WHY THE LOCK IS SCOPED (2026-09-08 — the wedge this shipped with). The guard used to be this
+/// function's FIRST statement, and so was still held when `reconcile_container_shares` ran below.
+/// That callee reaches `share_to_org_placed_notifying`, whose first statement acquires the SAME
+/// non-reentrant mutex — so the task awaited a lock it already held: it never returned, never
+/// dropped its guard, and every later org operation in the process blocked forever. The symptom was
+/// a "Syncing…" button that never came back and an app that needed a restart before any org work
+/// happened again. `org_background_sync_tick` had the identical bug and was fixed on 2026-09-03;
+/// this command was missed because the oracle that caught it only looked at the tick. It now looks
+/// at every function (`commands::tests::org_mutex_scope_tests`).
 #[tauri::command]
 pub async fn org_sync_now(
     app: AppHandle,
     state: State<'_, AppState>,
     org_id: Option<String>,
+    drain: Option<bool>,
 ) -> Result<crate::storage::models::OrgSyncReport, AppError> {
-    let _mutation = state.lock_org_mutation().await;
     // The FE passes a SPECIFIC org id (→ sync only that org); the background tick / internal callers
     // pass `None` (→ sync the next round-robin org). This is the command-boundary
     // dispatch of the multi-org fix: a user-triggered "Sync now" from a picked org must not sync (or
     // report against) the wrong org.
-    let mut report = match org_id {
-        Some(id) => org_sync_one_now_with_app(state.inner(), &id, Some(app.clone())).await,
+    let mut report = match org_id.as_deref() {
+        // `drain: Some(false)` is for a caller that wants ONE page because it only needs this org's
+        // current head — the viewer resolving an edit conflict, not a user asking to catch up. It
+        // used to get one page for free; without this it would inherit the whole drain, turning a
+        // conflict-resolution click into a minute-long wait. It restores exactly the pre-drain cost:
+        // the container reconcile below still runs, for every arm, as it always did.
+        Some(id) if drain == Some(false) => {
+            let _mutation =
+                acquire_share_mutation_within(state.inner(), SHARE_MUTATION_WAIT).await?;
+            let mut report = crate::storage::models::OrgSyncReport::default();
+            let _outcome =
+                org_sync_one_page_into(state.inner(), id, Some(app.clone()), &mut report).await?;
+            report
+        }
+        Some(id) => drain_org_feed_now(state.inner(), id, Some(app.clone())).await?,
         None => {
+            // BOUNDED like every other user-reachable acquisition on this path: a busy — or wedged —
+            // holder must answer "busy", never park a button forever.
+            let _mutation =
+                acquire_share_mutation_within(state.inner(), SHARE_MUTATION_WAIT).await?;
             org_sync_now_inner_with_policy(
                 state.inner(),
                 OrgWorkPolicy::manual(),
                 Some(app.clone()),
             )
-            .await
+            .await?
         }
-    }?;
+    };
     // A manual "Sync now" should converge the containers too, not just the item feed — otherwise a
     // user who just renamed a shared folder presses Sync and nothing happens. Best-effort: a
     // container failure never turns a successful feed sync into an error.
+    //
+    // NO org-mutation guard is held here, and none may ever be: see this function's doc comment.
+    if let Some(id) = org_id.as_deref() {
+        crate::events::emit_org_sync_progress(
+            &app,
+            id,
+            "containers",
+            report.pulled,
+            report.ingested,
+        );
+    }
     if let Err(e) =
         crate::commands::org_containers::reconcile_container_shares(state.inner(), Some(&app)).await
     {
@@ -10271,6 +10391,148 @@ pub async fn org_sync_now(
         note_container_failure(&mut report, &e);
     }
     Ok(report)
+}
+
+/// How many bounded [`ORG_FEED_PAGE`] pages ONE user-triggered "Sync now" may drain. The product
+/// (160 items) is a press that visibly finishes a normal backlog; the cap is what keeps a
+/// pathological — or hostile — feed from turning one button into an unbounded download.
+const ORG_MANUAL_SYNC_MAX_PAGES: u32 = 40;
+
+/// How long the drain may keep STARTING new pages. A press must hand the UI back a report while the
+/// user is still watching it, even against a slow relay; whatever is left rides the background
+/// cadence, which now catches up in seconds rather than minutes. This is not a wall-clock ceiling on
+/// the call: the page in flight when it elapses always finishes (it holds the mutation lock and owes
+/// a durable cursor commit), and the container reconcile that follows is unbounded by design — the
+/// `org-sync-progress` event is what keeps the button honest meanwhile.
+const ORG_MANUAL_SYNC_DEADLINE: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// Drain ONE org's feed for a user-triggered sync: bounded pages until the feed is exhausted, the
+/// page cap is reached, or the deadline elapses.
+///
+/// The org mutation lock is taken and released PER PAGE, never across the whole drain. Holding it
+/// for the duration would serialize every share/revoke/unlock in the app behind a loop of network
+/// round trips — the exact shape `org_background_sync_tick` was fixed out of on 2026-09-03. Per page
+/// the worst case is one page's round trips, which is what the single-page command already cost.
+///
+/// A page that cannot take the lock is not an error once at least one page has landed: the drain
+/// stops, reports `more_pending`, and the background loop finishes the job.
+async fn drain_org_feed_now(
+    state: &AppState,
+    org_id: &str,
+    app: Option<AppHandle>,
+) -> Result<crate::storage::models::OrgSyncReport, AppError> {
+    let deadline = std::time::Instant::now() + ORG_MANUAL_SYNC_DEADLINE;
+    let mut report = crate::storage::models::OrgSyncReport::default();
+    let mut pages = 0u32;
+    loop {
+        // The deadline gates the START of a page, and a page already in flight always finishes: it
+        // holds the mutation lock and has a durable cursor commit to make, so abandoning it midway
+        // would be the one shape that could lose work. A page can wait up to `SHARE_MUTATION_WAIT`
+        // for the lock and then up to the client's 30 s request timeout, so the deadline bounds how
+        // long the drain keeps STARTING work, not the wall clock of the call.
+        if pages > 0 && std::time::Instant::now() >= deadline {
+            report.more_pending = true;
+            break;
+        }
+        let before_pulled = report.pulled;
+        let outcome = {
+            let mutation = match acquire_share_mutation_within(state, SHARE_MUTATION_WAIT).await {
+                Ok(guard) => guard,
+                // Partial progress plus an honest "there is more" beats failing a press that has
+                // already moved the replica forward.
+                Err(_) if pages > 0 => {
+                    report.more_pending = true;
+                    break;
+                }
+                Err(e) => return Err(e),
+            };
+            let page = org_sync_one_page_into(state, org_id, app.clone(), &mut report).await;
+            drop(mutation);
+            match page {
+                Ok(outcome) => outcome,
+                // Page ONE failing is the whole press failing — report it as such.
+                Err(e) if pages == 0 => return Err(e),
+                // A LATER page is different: everything the earlier pages committed is already in
+                // the local replica, and throwing that away as a bare error would hide real
+                // progress behind "Sync failed". Record the reason FIRST (it is the actionable one)
+                // and stop.
+                Err(e) => {
+                    report
+                        .errors
+                        .insert(0, format!("sync stopped: {}", brief_err(&e)));
+                    report.more_pending = true;
+                    break;
+                }
+            }
+        };
+        pages += 1;
+        // Say what the press has actually done so far. A press against a real backlog is many
+        // sequential round trips, and a label that never moves is indistinguishable from a wedge.
+        if let Some(handle) = app.as_ref() {
+            crate::events::emit_org_sync_progress(
+                handle,
+                org_id,
+                "feed",
+                report.pulled,
+                report.ingested,
+            );
+        }
+
+        let pulled_this_page = report.pulled - before_pulled;
+        // A FULL page is the only evidence that more may remain; anything short means the live feed
+        // is caught up.
+        //
+        // An AUTHOR-BACKFILL turn is neither: it spends the invocation repairing legacy NULL-author
+        // rows and never consults the live cursor, and it legitimately repairs ZERO of them. Judging
+        // it by the counts said "nothing happened, so we must be caught up" about a page that never
+        // asked — which is how a press could stop on such a turn and toast "Synced — up to date."
+        // with the server still holding pages.
+        //
+        // The turn scheduler is a PROCESS-GLOBAL atomic that the background tick toggles too, and
+        // this loop releases the mutex between pages, so consecutive backfill turns are possible —
+        // do not read this as "the next page is guaranteed to be live". It costs round trips, never
+        // termination: the page cap and the deadline bound the loop either way, and a drain that
+        // ends on one of them says `more_pending`.
+        let maybe_more = match outcome {
+            FeedPageOutcome::AuthorBackfill => true,
+            FeedPageOutcome::Live => pulled_this_page >= ORG_FEED_PAGE,
+        };
+        if !maybe_more {
+            break;
+        }
+        if pages >= ORG_MANUAL_SYNC_MAX_PAGES {
+            report.more_pending = true;
+            break;
+        }
+    }
+    tracing::info!(
+        target: "org",
+        pages,
+        pulled = report.pulled,
+        ingested = report.ingested,
+        tombstoned = report.tombstoned,
+        more_pending = report.more_pending,
+        errors = report.errors.len(),
+        "org feed drained (manual sync)"
+    );
+    Ok(report)
+}
+
+/// What one [`org_sync_one`] invocation actually spent its single page budget on.
+///
+/// The drain needs this and cannot infer it from the counts. An AUTHOR-BACKFILL turn consumes the
+/// invocation WITHOUT consulting the live cursor, and it legitimately repairs zero rows (the re-pull
+/// failed, the page failed validation, no row matched, the author id came back empty) — so both
+/// `pulled` and `authors_backfilled` read zero and a count-based "did anything happen?" concludes the
+/// feed is exhausted. It is not: nothing asked. That made a press stop on a backfill turn and toast
+/// "Synced — up to date." with pages still on the server, which is the same lie the drain exists to
+/// remove, reached from a different direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FeedPageOutcome {
+    /// The live cursor was consulted; the report's `pulled` delta says how much came back.
+    Live,
+    /// The budget went to repairing legacy NULL-author rows. The live feed is UNKNOWN after this.
+    AuthorBackfill,
 }
 
 /// One deliberately small feed page per org-sync invocation. A protocol-valid org blob may be up to
@@ -10385,6 +10647,28 @@ pub(crate) fn repair_missing_org_embeddings(
     Ok(repaired)
 }
 
+/// The ONE-PAGE mode of [`org_sync_now`] (`drain: Some(false)`), reachable without a
+/// `tauri::AppHandle`. Mirrors that arm exactly so an oracle can bind "one page" to it.
+#[cfg(test)]
+pub(crate) async fn org_sync_now_single_page_inner(
+    state: &AppState,
+    org_id: &str,
+) -> Result<crate::storage::models::OrgSyncReport, AppError> {
+    let _mutation = acquire_share_mutation_within(state, SHARE_MUTATION_WAIT).await?;
+    let mut report = crate::storage::models::OrgSyncReport::default();
+    let _outcome = org_sync_one_page_into(state, org_id, None, &mut report).await?;
+    Ok(report)
+}
+
+/// The drain [`org_sync_now`] runs for an FE-targeted org, reachable without a `tauri::AppHandle`.
+#[cfg(test)]
+pub(crate) async fn org_sync_now_drain_inner(
+    state: &AppState,
+    org_id: &str,
+) -> Result<crate::storage::models::OrgSyncReport, AppError> {
+    drain_org_feed_now(state, org_id, None).await
+}
+
 /// Sync exactly ONE (FE-targeted) org's feed — the single-org boundary of [`org_sync_now`]. Resolves
 /// the org (membership-checked, never `.next()`), then runs the same per-org pull/ingest via
 /// `org_sync_one` used by the round-robin scheduler. Offline / logged-out ⇒ an empty report (no-op),
@@ -10395,15 +10679,7 @@ pub(crate) async fn org_sync_one_now_inner(
     org_id: &str,
 ) -> Result<crate::storage::models::OrgSyncReport, AppError> {
     let _mutation = state.lock_org_mutation().await;
-    org_sync_one_now_with_app(state, org_id, None).await
-}
-
-async fn org_sync_one_now_with_app(
-    state: &AppState,
-    org_id: &str,
-    app: Option<AppHandle>,
-) -> Result<crate::storage::models::OrgSyncReport, AppError> {
-    org_sync_one_now_with_app_and_policy(state, org_id, app, OrgWorkPolicy::manual()).await
+    org_sync_one_now_with_app_and_policy(state, org_id, None, OrgWorkPolicy::manual()).await
 }
 
 #[cfg(test)]
@@ -10415,6 +10691,7 @@ pub(crate) async fn org_sync_one_now_with_pre_task_reader(
     org_sync_one_now_with_app_and_policy(state, org_id, None, OrgWorkPolicy::pre_task_reader()).await
 }
 
+#[cfg(test)]
 async fn org_sync_one_now_with_app_and_policy(
     state: &AppState,
     org_id: &str,
@@ -10422,29 +10699,7 @@ async fn org_sync_one_now_with_app_and_policy(
     policy: OrgWorkPolicy,
 ) -> Result<crate::storage::models::OrgSyncReport, AppError> {
     let mut report = crate::storage::models::OrgSyncReport::default();
-    let org = resolve_org(state, org_id)?;
-    let base = share_base_url(state)?;
-    if base.trim().is_empty() {
-        return Ok(report);
-    }
-    let access = match reconcile_token_outcome(valid_access_token(state).await) {
-        TokenOutcome::Proceed(a) => a,
-        // A dead session must not masquerade as a clean sync: an empty report renders as
-        // "Synced — up to date.", which is the most misleading thing the panel can say.
-        TokenOutcome::Fatal(e) => return Err(e),
-        TokenOutcome::SkipQuietly => return Ok(report),
-    };
-    let client = crate::share::client::ShareClient::new(&base)?;
-    org_sync_one(
-        state,
-        &client,
-        &access,
-        &org,
-        &mut report,
-        policy,
-        app,
-    )
-    .await?;
+    let _outcome = org_sync_one_page_with_policy(state, org_id, app, policy, &mut report).await?;
     tracing::info!(
         target: "org",
         pulled = report.pulled,
@@ -10455,6 +10710,42 @@ async fn org_sync_one_now_with_app_and_policy(
         "org feed sync (single org)"
     );
     Ok(report)
+}
+
+/// One bounded feed page for ONE org, ACCUMULATED into an existing report.
+///
+/// Split out of [`org_sync_one_now_with_app_and_policy`] so [`drain_org_feed_now`] can take several
+/// pages under one report without each page resetting the counts the caller is about to show.
+async fn org_sync_one_page_into(
+    state: &AppState,
+    org_id: &str,
+    app: Option<AppHandle>,
+    report: &mut crate::storage::models::OrgSyncReport,
+) -> Result<FeedPageOutcome, AppError> {
+    org_sync_one_page_with_policy(state, org_id, app, OrgWorkPolicy::manual(), report).await
+}
+
+async fn org_sync_one_page_with_policy(
+    state: &AppState,
+    org_id: &str,
+    app: Option<AppHandle>,
+    policy: OrgWorkPolicy,
+    report: &mut crate::storage::models::OrgSyncReport,
+) -> Result<FeedPageOutcome, AppError> {
+    let org = resolve_org(state, org_id)?;
+    let base = share_base_url(state)?;
+    if base.trim().is_empty() {
+        return Ok(FeedPageOutcome::Live);
+    }
+    let access = match reconcile_token_outcome(valid_access_token(state).await) {
+        TokenOutcome::Proceed(a) => a,
+        // A dead session must not masquerade as a clean sync: an empty report renders as
+        // "Synced — up to date.", which is the most misleading thing the panel can say.
+        TokenOutcome::Fatal(e) => return Err(e),
+        TokenOutcome::SkipQuietly => return Ok(FeedPageOutcome::Live),
+    };
+    let client = crate::share::client::ShareClient::new(&base)?;
+    org_sync_one(state, &client, &access, &org, report, policy, app).await
 }
 
 #[cfg(test)]
@@ -10545,9 +10836,9 @@ async fn org_sync_one(
     report: &mut crate::storage::models::OrgSyncReport,
     policy: OrgWorkPolicy,
     app: Option<AppHandle>,
-) -> Result<(), AppError> {
+) -> Result<FeedPageOutcome, AppError> {
     if !policy.is_current() {
-        return Ok(());
+        return Ok(FeedPageOutcome::Live);
     }
 
     // Legacy author repair consumes this invocation's SAME single-page budget instead of issuing a
@@ -10563,7 +10854,7 @@ async fn org_sync_one(
     if take_backfill_turn {
         backfill_null_org_item_authors(state, client, access, &org.org_id, report, policy).await;
         report.last_seq = state.db.org_last_seq_for(&org.org_id)?;
-        return Ok(());
+        return Ok(FeedPageOutcome::AuthorBackfill);
     }
 
     // ── ASYNC PULL PHASE — fetch one page, opening each cell; buffer only that bounded page ───────
@@ -10637,7 +10928,7 @@ async fn org_sync_one(
         .org_feed(access, &org.org_id, cursor, ORG_FEED_PAGE)
         .await?;
     if !policy.is_current() {
-        return Ok(());
+        return Ok(FeedPageOutcome::Live);
     }
     if feed.items.len() > ORG_FEED_PAGE as usize {
         return Err(AppError::Unavailable(
@@ -10649,7 +10940,7 @@ async fn org_sync_one(
     let mut last_feed_seq = cursor;
     'items: for item in &feed.items {
         if !policy.is_current() {
-            return Ok(());
+            return Ok(FeedPageOutcome::Live);
         }
         if item.seq <= last_feed_seq {
             return Err(AppError::Unavailable(
@@ -10697,7 +10988,7 @@ async fn org_sync_one(
                 Ok(k) => k,
                 Err(e) => {
                     if !policy.is_current() {
-                        return Ok(());
+                        return Ok(FeedPageOutcome::Live);
                     }
                     report.errors.push(format!(
                         "item {}: key unavailable ({})",
@@ -10708,13 +10999,13 @@ async fn org_sync_one(
                 }
             };
         if !policy.is_current() {
-            return Ok(());
+            return Ok(FeedPageOutcome::Live);
         }
         let ciphertext = match client.get_blob(access, &blob_id).await {
             Ok(c) => c,
             Err(e) => {
                 if !policy.is_current() {
-                    return Ok(());
+                    return Ok(FeedPageOutcome::Live);
                 }
                 // TRANSIENT: a network blob-fetch failure may succeed next sync → STOP, don't skip.
                 report.errors.push(format!(
@@ -10726,7 +11017,7 @@ async fn org_sync_one(
             }
         };
         if !policy.is_current() {
-            return Ok(());
+            return Ok(FeedPageOutcome::Live);
         }
         if ciphertext.len() > murmur_protocol::caps::MAX_ORG_ITEM_BLOB_BYTES {
             report.errors.push(format!(
@@ -11107,7 +11398,7 @@ async fn org_sync_one(
 
     // `report.last_seq` reflects the LAST org synced (per-org field on an aggregate report).
     report.last_seq = state.db.org_last_seq_for(&org.org_id)?;
-    Ok(())
+    Ok(FeedPageOutcome::Live)
 }
 
 // ── ANTI-ENTROPY RECONCILE SWEEP (2026-07-26) ─────────────────────────────────────────────────────

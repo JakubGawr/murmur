@@ -1043,7 +1043,12 @@ pub fn run() {
                         crate::commands::ORG_SYNC_FIRST_DELAY_SECS,
                     ))
                     .await;
+                    // Consecutive productive ticks taken at the catch-up cadence. Reset by any
+                    // quiet tick, and capped so a feed that always reports "changed" can never
+                    // become a permanent 3 s poll (`ORG_SYNC_MAX_CATCHUP_TICKS`).
+                    let mut catching_up = 0_u32;
                     loop {
+                        let mut changed = false;
                         if let Some(state) = handle.try_state::<AppState>() {
                             // On a PRODUCTIVE tick (≥1 ingest/tombstone) emit a content-free
                             // `org-feed-updated` ping so an open FE view (Notes org picker /
@@ -1057,12 +1062,19 @@ pub fn run() {
                             .await
                             {
                                 crate::events::emit_org_feed_updated(&handle, 1);
+                                changed = true;
                             }
                         }
-                        tokio::time::sleep(std::time::Duration::from_secs(
-                            crate::commands::ORG_SYNC_TICK_SECS,
-                        ))
-                        .await;
+                        // A tick that moved the replica means the feed had a backlog, and one tick
+                        // drains one bounded page. Sleeping the full minute anyway is what made a
+                        // freshly shared Space arrive four objects at a time over several minutes.
+                        // The decision lives in `org_sync_next_delay_secs` so its DUTY CYCLE — not
+                        // just its constants — can be asserted.
+                        let sleep_secs = crate::commands::org_sync_next_delay_secs(
+                            changed,
+                            &mut catching_up,
+                        );
+                        tokio::time::sleep(std::time::Duration::from_secs(sleep_secs)).await;
                     }
                 });
             }

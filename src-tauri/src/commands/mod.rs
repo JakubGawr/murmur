@@ -14320,9 +14320,26 @@ pub async fn account_login(
     // Membership discovery: reconcile the org set the server says we belong to (owned AND invited)
     // into local `org_state` now the session is cached — so an org we were invited to appears (and
     // becomes syncable) at login, not only after a create. Best-effort: a failure never blocks login.
-    if let Err(e) = org_reconcile_memberships_notifying(state.inner(), Some(&app)).await {
-        tracing::warn!(target: "org", error = %brief_err(&e), "org membership reconcile at login failed (non-fatal)");
+    // Serialized like `org_refresh` and the biometric-unlock path: an unlocked reconcile can
+    // `purge_org_replica` while the background tick is mid-ingest, and the items committed after
+    // that purge re-create a searchable local copy for an org the user has just left. Bounded and
+    // best-effort — a busy lock means the next tick reconciles instead.
+    match acquire_share_mutation_within(state.inner(), SHARE_MUTATION_WAIT).await {
+        Ok(_mutation) => {
+            if let Err(e) = org_reconcile_memberships_notifying(state.inner(), Some(&app)).await {
+                tracing::warn!(target: "org", error = %brief_err(&e), "org membership reconcile at login failed (non-fatal)");
+            }
+        }
+        Err(e) => {
+            tracing::warn!(target: "org", error = %brief_err(&e), "org membership reconcile at login skipped — sharing busy");
+        }
     }
+    // Then tell every open view to re-read, UNCONDITIONALLY — the reconcile above only pings when
+    // MEMBERSHIP changed, and what actually went stale is every org-derived read the frontend took
+    // while there was no session (the sidebar's received forest included). Content-free, and every
+    // consumer answers it with local reads, so it costs no egress. Mirrors the same emit in
+    // `unlock_sharing_with_biometric`, which is the path most people actually use at launch.
+    crate::events::emit_org_feed_updated(&app, 0);
 
     // Build every fallible field BEFORE stamping the one-way latch. Once the latch is set there are
     // no remaining `?` paths: this invocation is committed to return `Ok(AccountStatus)`.
@@ -14423,6 +14440,7 @@ pub async fn account_logout(state: State<'_, AppState>) -> Result<(), AppError> 
 /// back to the password login. The MK never touches the log.
 #[tauri::command]
 pub async fn unlock_sharing_with_biometric(
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<AccountStatus, AppError> {
     // Must be logged in (tokens present) to have anything to restore.
@@ -14467,6 +14485,45 @@ pub async fn unlock_sharing_with_biometric(
         target: "share",
         "unlock_sharing_with_biometric: session restored from the biometric MK cache"
     );
+
+    // Tell every open view to re-read, UNCONDITIONALLY and IMMEDIATELY. What went stale here is
+    // every org-derived read the frontend took while there was no session — the sidebar's received
+    // forest included. The event is content-free and every consumer answers it with LOCAL reads, so
+    // it costs no egress and does not wait on the network.
+    crate::events::emit_org_feed_updated(&app, 0);
+
+    // A restored session is a SIGN-IN, and `account_login` has always treated it as one: it
+    // reconciles the org set the server says we belong to, so an org we were invited to appears
+    // without a restart. This path — the Touch ID tap most people actually use at launch, since the
+    // password login only happens once per device — did neither. It restored the session and
+    // returned, and nothing else asked the server anything until the background tick a minute
+    // later, which only notifies when membership genuinely CHANGED. So the sidebar and the org
+    // lists kept whatever they had read before the user signed in, and the only reliable way to see
+    // an org was to quit and reopen the app.
+    //
+    // DETACHED on purpose: it is a `GET /v1/orgs` behind a 30 s client timeout, and making the user
+    // watch the Touch ID sheet's aftermath for that long to learn something the panel refreshes on
+    // its own is the wrong trade. It emits its own `org-feed-updated` if membership actually moved.
+    //
+    // UNDER THE ORG MUTATION LOCK, like `org_refresh` — the reconcile can `purge_org_replica` an org
+    // the server no longer lists, and the background sync tick commits ingested feed items one
+    // transaction at a time. Unserialized, a purge landing mid-tick lets the items the tick commits
+    // afterwards re-create `org_items`/`org_chunks`/FTS rows for an org the user has just left,
+    // which is exactly the searchable-copy-after-departure the purge exists to prevent. Bounded, and
+    // skipped if the lock is busy: this is best-effort discovery, and the tick reconciles anyway.
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let Some(state) = handle.try_state::<AppState>() else {
+            return;
+        };
+        let Ok(_mutation) = acquire_share_mutation_within(state.inner(), SHARE_MUTATION_WAIT).await
+        else {
+            return;
+        };
+        if let Err(e) = org_reconcile_memberships_notifying(state.inner(), Some(&handle)).await {
+            tracing::warn!(target: "org", error = %brief_err(&e), "org membership reconcile after biometric unlock failed (non-fatal)");
+        }
+    });
 
     account_status(state)
 }

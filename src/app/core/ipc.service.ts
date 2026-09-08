@@ -119,6 +119,7 @@ import type {
   OrgSourceRef,
   OrgSourceShareStatus,
   OrgStatus,
+  OrgSyncProgress,
   OrgSyncReport,
   OrgTask,
   PeopleList,
@@ -234,6 +235,14 @@ export const EVENT_ORG_FEED_UPDATED = "murmur://org-feed-updated";
 /** Progress of one container share. Counts only — no folder name, no item id. */
 export const EVENT_CONTAINER_SHARE_PROGRESS =
   "murmur://container-share-progress";
+/**
+ * Progress of one user-triggered org "Sync now". Counts + a stage name only.
+ *
+ * A manual sync is several bounded feed pages followed by a container reconcile, all sequential
+ * network round trips. Without this the button is an indeterminate "Syncing…" for the duration,
+ * which is exactly what got reported as "it keeps syncing and you don't know the status".
+ */
+export const EVENT_ORG_SYNC_PROGRESS = "murmur://org-sync-progress";
 // Delete fan-out fix — a note/meeting delete FULLY succeeded (local rows gone + any org shares
 // revoked); lets OTHER open surfaces (the tab-strip) prune themselves. Content-free (id + kind only).
 export const EVENT_CONTENT_DELETED = "murmur://content-deleted";
@@ -964,8 +973,13 @@ export class IpcService {
   }
 
   /** Manually pull + ingest a SPECIFIC org's feed now → the {@link OrgSyncReport} (counts + errors only). */
-  orgSyncNow(orgId: string): Promise<OrgSyncReport> {
-    return invoke<OrgSyncReport>("org_sync_now", { orgId });
+  /**
+   * Sync one org now. `drain` (default) walks bounded feed pages until the org is caught up or the
+   * command's own cap stops it — what the "Sync now" button means. Pass `false` when you only need
+   * this org's current head (the conflict viewer), so a click does not inherit a whole backlog.
+   */
+  orgSyncNow(orgId: string, drain = true): Promise<OrgSyncReport> {
+    return invoke<OrgSyncReport>("org_sync_now", { orgId, drain });
   }
 
   /**
@@ -3986,6 +4000,19 @@ export class IpcService {
     return listen<{ done: number; total: number }>(
       EVENT_CONTAINER_SHARE_PROGRESS,
       (e) => cb(e.payload.done, e.payload.total),
+    );
+  }
+
+  /**
+   * Progress of the org "Sync now" in flight. `stage` is `"feed"` while feed pages are draining and
+   * `"containers"` while shared folders reconcile; the counts are what the press has consumed so
+   * far. `orgId` lets a listener drop an event from a previous press.
+   */
+  onOrgSyncProgress(
+    cb: (progress: OrgSyncProgress) => void,
+  ): Promise<UnlistenFn> {
+    return listen<OrgSyncProgress>(EVENT_ORG_SYNC_PROGRESS, (e) =>
+      cb(e.payload),
     );
   }
 }
